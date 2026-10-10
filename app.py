@@ -16,6 +16,7 @@ console window stops it. Re-running is safe: songs already saved are skipped.
 
 import glob
 import json
+import math
 import os
 import random
 import re
@@ -38,7 +39,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.4"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.5"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -58,6 +59,11 @@ MEDIA_EXTS = {".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi", ".flv", ".3gp", "
 AUDIO_EXTS = (".mp3", ".m4a", ".opus", ".ogg", ".flac", ".wav")
 # Audio codec -> file extension when keeping the original audio without re-encoding
 COPY_EXT = {"aac": "m4a", "alac": "m4a", "mp3": "mp3", "opus": "opus", "vorbis": "ogg", "flac": "flac"}
+FORMATS = ("mp3_320", "mp3_192", "flac", "wav", "original")
+COVER_EXTS = ("mp3", "flac", "m4a")  # containers ffmpeg can put a cover picture in
+SQUARE_CROP = "crop='min(iw,ih)':'min(iw,ih)'"  # centre square of a picture
+LOUDNORM = "loudnorm=I=-14:TP=-1.5:LRA=11"  # -14 LUFS, true peak -1.5 dB: what streaming services use
+EXTRACT_AUDIO_ARGS = "extractaudio+ffmpeg_o"  # where yt-dlp looks for extra ffmpeg options when converting
 BLOCKED_SIGNS = ("not a bot", "HTTP Error 429", "rate-limit", "rate limit")
 # A YouTube link anywhere in pasted text: videos, youtu.be, Shorts, live, playlists, channels, YouTube Music
 LINK_RE = re.compile(r"(?<![\w.-])(?:https?://)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)/[^\s<>\"'()\[\]{}]+", re.I)
@@ -80,12 +86,71 @@ DEFAULT_SETTINGS = {
     "square_cover": True,
     "song_tags": False,  # off: covers can be linked to the original song and get its artist
     "split_chapters": False,
+    "normalize": False,  # even out the volume
+    "cover": "",         # the user's own cover image; empty: the video thumbnail
+    "lyrics": False,     # the video description as lyrics
+    "lang": "",          # "en" or "el"; empty: the browser's language
     "cookies": "",
 }
 
 
 class UserError(Exception):
     """A problem the user can fix; shown on the page as-is."""
+
+
+# ---------- language ----------
+# The page sends its language with every request (X-Lang); messages made here follow it.
+
+MESSAGES_EL = {
+    "Choose a folder to save the songs in.": "Επιλέξτε φάκελο για να αποθηκευτούν τα τραγούδια.",
+    "Tick at least one of Videos, Live streams or Shorts.":
+        "Επιλέξτε τουλάχιστον ένα από τα Βίντεο, Ζωντανές μεταδόσεις ή Shorts.",
+    "Paste your channel link first, e.g. https://www.youtube.com/@yourname":
+        "Επικολλήστε πρώτα τον σύνδεσμο του καναλιού σας, π.χ. https://www.youtube.com/@yourname",
+    "Couldn't read that link. {problem}": "Δεν ήταν δυνατή η ανάγνωση του συνδέσμου. {problem}",
+    "Couldn't read those links. {problem}": "Δεν ήταν δυνατή η ανάγνωση των συνδέσμων. {problem}",
+    "No album links found. Paste YouTube Music album links like "
+    "https://music.youtube.com/playlist?list=OLAK5uy_… one per line.":
+        "Δεν βρέθηκαν σύνδεσμοι άλμπουμ. Επικολλήστε συνδέσμους άλμπουμ του YouTube Music, όπως "
+        "https://music.youtube.com/playlist?list=OLAK5uy_…, έναν ανά γραμμή.",
+    "{url}: this is a single video, not an album. Use Paste links for it.":
+        "{url}: αυτό είναι ένα μεμονωμένο βίντεο, όχι άλμπουμ. Χρησιμοποιήστε την «Επικόλληση συνδέσμων».",
+    "No YouTube links found. Paste links like https://www.youtube.com/watch?v=… or https://youtu.be/…, one per line.":
+        "Δεν βρέθηκαν σύνδεσμοι YouTube. Επικολλήστε συνδέσμους όπως https://www.youtube.com/watch?v=… "
+        "ή https://youtu.be/…, έναν ανά γραμμή.",
+    "Choose the folder that contains your video files.": "Επιλέξτε τον φάκελο με τα αρχεία βίντεο.",
+    "Folder not found: {path}": "Ο φάκελος δεν βρέθηκε: {path}",
+    "No video or audio files found in that folder. If it's a Google Takeout .zip, unzip it first.":
+        "Δεν βρέθηκαν αρχεία βίντεο ή ήχου σε αυτόν τον φάκελο. Αν πρόκειται για αρχείο .zip του "
+        "Google Takeout, αποσυμπιέστε το πρώτα.",
+    "A download is already running.": "Μια λήψη βρίσκεται ήδη σε εξέλιξη.",
+    "ffmpeg is missing. Start the app again with Start.command, Start.bat or start.sh to install it.":
+        "Λείπει το ffmpeg. Ανοίξτε ξανά την εφαρμογή με το Start.command, το Start.bat ή το start.sh "
+        "για να εγκατασταθεί.",
+    "Select at least one item.": "Επιλέξτε τουλάχιστον ένα στοιχείο.",
+    "Unknown format.": "Άγνωστη μορφή.",
+    "The cover image wasn't found: {path}": "Η εικόνα εξωφύλλου δεν βρέθηκε: {path}",
+    "No file picker found on this computer. Type or paste the path instead.":
+        "Δεν βρέθηκε παράθυρο επιλογής σε αυτόν τον υπολογιστή. Πληκτρολογήστε ή επικολλήστε τη διαδρομή.",
+    "That folder doesn't exist yet. It's created when the first song is saved.":
+        "Ο φάκελος δεν υπάρχει ακόμη. Θα δημιουργηθεί μόλις αποθηκευτεί το πρώτο τραγούδι.",
+    "YouTube is temporarily blocking downloads from this computer. Wait an hour and press Download again "
+    "(saved songs are skipped), or pick your browser under \"If YouTube blocks the downloads\".":
+        "Το YouTube μπλοκάρει προσωρινά τις λήψεις από αυτόν τον υπολογιστή. Περιμένετε μία ώρα και πατήστε "
+        "ξανά «Λήψη» (τα αποθηκευμένα τραγούδια παραλείπονται) ή επιλέξτε τον περιηγητή σας στο "
+        "«Αν το YouTube μπλοκάρει τις λήψεις».",
+    "This file has no audio track.": "Αυτό το αρχείο δεν έχει ήχο.",
+    "Something went wrong: {error}": "Κάτι πήγε στραβά: {error}",
+    "Unexpected error: {error}": "Απρόσμενο σφάλμα: {error}",
+}
+LANGUAGE = threading.local()  # .lang for the request or job running on this thread
+
+
+def tr(text, **values):
+    """The message in the page's language (English is the key), with {placeholders} filled in."""
+    if getattr(LANGUAGE, "lang", "en") == "el":
+        text = MESSAGES_EL.get(text, text)
+    return text.format(**values) if values else text
 
 
 # ---------- tools ----------
@@ -172,7 +237,7 @@ def save_settings(changes):
 def out_dir(settings):
     out = (settings.get("out") or "").strip()
     if not out:
-        raise UserError("Choose a folder to save the songs in.")
+        raise UserError(tr("Choose a folder to save the songs in."))
     return Path(out).expanduser()
 
 
@@ -372,12 +437,104 @@ class SquareCover(PostProcessor):
             tmp = path + ".square.jpg"
             result = subprocess.run(
                 [FFMPEG, "-nostdin", "-y", "-loglevel", "error", "-i", path,
-                 "-vf", "crop='min(iw,ih)':'min(iw,ih)'", "-q:v", "2", tmp],
+                 "-vf", SQUARE_CROP, "-q:v", "2", tmp],
                 capture_output=True)
             if result.returncode == 0:
                 os.replace(tmp, path)
             elif os.path.exists(tmp):
                 os.remove(tmp)
+        return [], info
+
+
+def loudness_filter(path):
+    """Measures a file's loudness and returns (filter, sample rate) that bring it to -14 LUFS, the
+    level of streaming services, in one even volume change (linear), so the music's dynamics stay
+    as they are. None if it can't be measured (e.g. silence)."""
+    result = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(path), "-vn",
+                             "-af", LOUDNORM + ":print_format=json", "-f", "null", "-"], capture_output=True, **TEXT)
+    match = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", result.stderr)
+    if result.returncode or not match:
+        return None
+    try:
+        found = json.loads(match.group(0))
+        m = {k: float(found[k]) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
+    except (KeyError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in m.values()):
+        return None
+    rate = re.search(r"Audio: .*?, (\d+) Hz", result.stderr)  # loudnorm itself outputs 192 kHz
+    return (f"{LOUDNORM}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+            f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true",
+            int(rate.group(1)) if rate else 48000)
+
+
+class MeasureLoudness(PostProcessor):
+    """Runs just before yt-dlp's audio conversion: measures the download and hands the matching
+    volume change to the converter, so each song is encoded only once."""
+
+    def __init__(self, job):
+        super().__init__()
+        self.job = job
+
+    def run(self, info):
+        args = self._downloader.params.setdefault("postprocessor_args", {})
+        args.pop(EXTRACT_AUDIO_ARGS, None)
+        path = info.get("filepath")
+        if path and os.path.isfile(path):
+            self.job.stage = "measuring"
+            if measured := loudness_filter(path):
+                args[EXTRACT_AUDIO_ARGS] = ["-af", measured[0], "-ar", str(measured[1])]
+            self.job.stage = "converting"
+        return [], info
+
+
+class OwnCover(PostProcessor):
+    """Puts the user's own image in place of the video thumbnail, before it's embedded."""
+
+    def __init__(self, image):
+        super().__init__()
+        self.image = image
+
+    def run(self, info):
+        for thumb in info.get("thumbnails") or []:
+            path = thumb.get("filepath")
+            if not path or not os.path.exists(path):
+                continue
+            tmp = path + ".own.jpg"
+            result = subprocess.run([FFMPEG, "-nostdin", "-y", "-loglevel", "error", "-i", self.image,
+                                     "-frames:v", "1", "-q:v", "2", tmp], capture_output=True)
+            if result.returncode == 0:
+                os.replace(tmp, path)
+        return [], info
+
+
+def write_lyrics(path, text):
+    """Saves text in the file's lyrics tag (shown as lyrics in Apple Music and most players).
+    WAV files have no lyrics tag that players read, so they're left alone."""
+    import mutagen
+    from mutagen.id3 import ID3, USLT, ID3NoHeaderError
+    suffix = Path(path).suffix.lower()
+    if suffix == ".mp3":
+        try:
+            id3 = ID3(path)
+        except ID3NoHeaderError:
+            id3 = ID3()
+        id3.delall("USLT")
+        id3.add(USLT(encoding=3, lang="eng", desc="", text=text))
+        id3.save(path)
+    elif suffix in (".m4a", ".flac", ".opus", ".ogg"):
+        audio = mutagen.File(path)
+        audio["\xa9lyr" if suffix == ".m4a" else "LYRICS"] = [text]
+        audio.save()
+
+
+class DescriptionLyrics(PostProcessor):
+    """Saves the video's description (e.g. your own lyrics or credits) as the song's lyrics."""
+
+    def run(self, info):
+        text, path = (info.get("description") or "").strip(), info.get("filepath")
+        if text and path and os.path.isfile(path):
+            write_lyrics(path, text)
         return [], info
 
 
@@ -475,7 +632,8 @@ def scan_sources(sources, settings):
                 "done": entry["id"] in archive,
             })
     if not items and problems:
-        raise UserError(f"Couldn't read {'that link' if len(problems) == 1 else 'those links'}. {problems[0]}")
+        raise UserError(tr("Couldn't read that link. {problem}" if len(problems) == 1
+                           else "Couldn't read those links. {problem}", problem=problems[0]))
     # Same title twice (e.g. two takes of one song): add the video id so neither file overwrites the other
     counts = Counter(i["title"].casefold() for i in items)
     for item in items:
@@ -491,8 +649,8 @@ def scan_youtube(body):
     sources = expand_sources(settings["url"], tabs)
     if not sources:
         if settings["url"].strip():  # only a channel link, with no tab ticked
-            raise UserError("Tick at least one of Videos, Live streams or Shorts.")
-        raise UserError("Paste your channel link first, e.g. https://www.youtube.com/@yourname")
+            raise UserError(tr("Tick at least one of Videos, Live streams or Shorts."))
+        raise UserError(tr("Paste your channel link first, e.g. https://www.youtube.com/@yourname"))
     return scan_sources(sources, settings)
 
 
@@ -506,8 +664,8 @@ def scan_albums(body):
     settings = save_settings(body)
     links = find_links(settings["albums"])
     if not links:
-        raise UserError("No album links found. Paste YouTube Music album links like "
-                        "https://music.youtube.com/playlist?list=OLAK5uy_… one per line.")
+        raise UserError(tr("No album links found. Paste YouTube Music album links like "
+                           "https://music.youtube.com/playlist?list=OLAK5uy_… one per line."))
     archive = read_archive(out_dir(settings))
     with ThreadPoolExecutor(max_workers=SCAN_WORKERS) as pool:
         results = list(pool.map(lambda url: read_source((url, "Album"), settings), links))
@@ -519,7 +677,7 @@ def scan_albums(body):
         if not info or info.get("id") in albums:
             continue
         if info.get("_type") != "playlist":
-            problems.append(f"{url}: this is a single video, not an album. Use Paste links for it.")
+            problems.append(tr("{url}: this is a single video, not an album. Use Paste links for it.", url=url))
             continue
         albums.add(info["id"])
         tracks = list(video_entries(info))
@@ -546,7 +704,8 @@ def scan_albums(body):
                 "tracks": len(tracks),
             })
     if not items and problems:
-        raise UserError(f"Couldn't read {'that link' if len(problems) == 1 else 'those links'}. {problems[0]}")
+        raise UserError(tr("Couldn't read that link. {problem}" if len(problems) == 1
+                           else "Couldn't read those links. {problem}", problem=problems[0]))
     return {"channel": "", "items": items, "problems": problems}
 
 
@@ -554,8 +713,8 @@ def scan_links(body):
     settings = save_settings(body)
     links = find_links(settings["links"])
     if not links:
-        raise UserError("No YouTube links found. Paste links like https://www.youtube.com/watch?v=… "
-                        "or https://youtu.be/…, one per line.")
+        raise UserError(tr("No YouTube links found. Paste links like https://www.youtube.com/watch?v=… "
+                           "or https://youtu.be/…, one per line."))
     # A channel link pasted here brings all of its videos, live streams and Shorts
     return scan_sources(expand_sources("\n".join(links), list(CHANNEL_TABS)), settings)
 
@@ -564,26 +723,30 @@ def run_youtube_job(job, settings):
     out = out_dir(settings)
     out.mkdir(parents=True, exist_ok=True)
     args = base_args(settings) + [
-        "--no-playlist", "-f", "bestaudio/best", "-x",
-        "--embed-metadata", "--embed-thumbnail", "--convert-thumbnails", "jpg",
+        "--no-playlist", "-f", "bestaudio/best", "-x", "--embed-metadata",
         "--download-archive", str(out / ARCHIVE_NAME), "-P", str(out),
         "--windows-filenames", "--trim-filenames", "120",
         "--retries", "10", "--fragment-retries", "10",
     ]
-    if settings["format"] in ("mp3_320", "mp3_192"):
-        args += ["--audio-format", "mp3", "--audio-quality", "320K" if settings["format"] == "mp3_320" else "192K"]
+    fmt = settings["format"]
+    if fmt in ("mp3_320", "mp3_192"):
+        args += ["--audio-format", "mp3", "--audio-quality", "320K" if fmt == "mp3_320" else "192K"]
+    elif fmt in ("flac", "wav"):
+        args += ["--audio-format", fmt]
     # "original": -x alone keeps YouTube's own audio stream (Opus or AAC) without re-encoding
+    if fmt != "wav":  # WAV files can't hold a cover picture
+        args += ["--embed-thumbnail", "--convert-thumbnails", "jpg"]
 
     def progress(d):
         if job.cancel:
             raise DownloadCancelled("Stopped")
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
-            job.stage = "Downloading"
+            job.stage = "downloading"
             if total:
                 job.percent = min(99.0, d.get("downloaded_bytes", 0) * 100 / total)
         elif d["status"] == "finished":
-            job.stage, job.percent = "Converting", 100.0
+            job.stage, job.percent = "converting", 100.0
 
     # Songs saved earlier that were ticked again (maybe the file was deleted): fetch them again
     archive = read_archive(out)
@@ -605,20 +768,28 @@ def run_youtube_job(job, settings):
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.add_post_processor(tags, when="pre_process")
+        if settings["cover"]:
+            ydl.add_post_processor(OwnCover(settings["cover"]), when="before_dl")  # after the jpg conversion
         if settings["square_cover"] and FFMPEG:
-            ydl.add_post_processor(SquareCover(), when="before_dl")  # runs after the jpg conversion
+            ydl.add_post_processor(SquareCover(), when="before_dl")
+        if settings["normalize"] and fmt != "original" and FFMPEG:  # "original" isn't re-encoded
+            measure = MeasureLoudness(job)
+            measure.set_downloader(ydl)
+            ydl._pps["post_process"].insert(0, measure)  # must run before yt-dlp's own audio conversion
+        if settings["lyrics"]:
+            ydl.add_post_processor(DescriptionLyrics(), when="post_process")  # after tags and cover
         if splitter:
             ydl.add_post_processor(splitter, when="post_process")  # after the tags and cover are in
         downloaded_any = False
         for job.index, item in enumerate(job.items, 1):
             if job.cancel:
                 break
-            job.current, job.stage, job.percent = display_name(item), "Starting", 0.0
+            job.current, job.stage, job.percent = display_name(item), "starting", 0.0
             if item["id"] in archive:
                 job.set_result(item, "skipped")
                 continue
             if downloaded_any:
-                job.stage = "Pausing a few seconds (keeps YouTube happy)"
+                job.stage = "pausing"
                 job.pause(random.uniform(*PAUSE_BETWEEN))
                 if job.cancel:
                     break
@@ -649,9 +820,9 @@ def run_youtube_job(job, settings):
                 reason = clean_error(err)
                 job.set_result(item, "failed", reason)
                 if any(sign in reason for sign in BLOCKED_SIGNS):
-                    job.message = ("YouTube is temporarily blocking downloads from this computer. "
-                                   "Wait an hour and press Download again (saved songs are skipped), or "
-                                   "pick your browser under \"If YouTube blocks the downloads\".")
+                    job.message = tr("YouTube is temporarily blocking downloads from this computer. "
+                                     "Wait an hour and press Download again (saved songs are skipped), or "
+                                     "pick your browser under \"If YouTube blocks the downloads\".")
                     break
 
 
@@ -678,10 +849,10 @@ def scan_folder(body):
     settings = save_settings(body)
     folder = (settings.get("folder") or "").strip()
     if not folder:
-        raise UserError("Choose the folder that contains your video files.")
+        raise UserError(tr("Choose the folder that contains your video files."))
     root = Path(folder).expanduser()
     if not root.is_dir():
-        raise UserError(f"Folder not found: {root}")
+        raise UserError(tr("Folder not found: {path}", path=root))
     out = out_dir(settings)
     items = []
     for path in sorted(root.rglob("*"), key=lambda p: str(p).casefold()):
@@ -692,8 +863,8 @@ def scan_folder(body):
                       "section": str(path.parent.relative_to(root)) if path.parent != root else "",
                       "done": already_converted(out, path.stem)})
     if not items:
-        raise UserError("No video or audio files found in that folder. "
-                        "If it's a Google Takeout .zip, unzip it first.")
+        raise UserError(tr("No video or audio files found in that folder. "
+                           "If it's a Google Takeout .zip, unzip it first."))
     return {"channel": "", "items": items, "problems": []}
 
 
@@ -707,31 +878,48 @@ def run_folder_job(job, settings):
     if album:
         tags += ["-metadata", f"album={album}"]
 
+    cover = settings["cover"]
+    crop = ["-vf", SQUARE_CROP] if settings["square_cover"] else []
+
     for job.index, item in enumerate(job.items, 1):
         if job.cancel:
             break
         src = Path(item["id"])
-        job.current, job.stage, job.percent = display_name(item), "Converting", 0.0
+        job.current, job.stage, job.percent = display_name(item), "converting", 0.0
         stem = folder_name(item["name"]) if (item.get("name") or "").strip() else src.stem
-        if settings["format"] == "original":
-            codec = audio_codec(src)
+        fmt = settings["format"]
+        codec = audio_codec(src) if fmt in ("original", "wav") else None
+        if fmt == "original":
             if codec and codec.startswith("pcm_"):
                 ext, codec_args = "wav", ["-c:a", "copy"]
             elif codec in COPY_EXT:
                 ext, codec_args = COPY_EXT[codec], ["-c:a", "copy"]
             else:  # unusual codec: keep it lossless
                 ext, codec_args = "flac", ["-c:a", "flac"]
+        elif fmt == "wav":  # an original that is already PCM keeps its bit depth; anything else: CD quality
+            ext, codec_args = "wav", ["-c:a", codec if codec and codec.startswith("pcm_") else "pcm_s16le"]
+        elif fmt == "flac":
+            ext, codec_args = "flac", ["-c:a", "flac"]
         else:
-            ext = "mp3"
-            codec_args = ["-c:a", "libmp3lame", "-b:a", "320k" if settings["format"] == "mp3_320" else "192k"]
+            ext, codec_args = "mp3", ["-c:a", "libmp3lame", "-b:a", "320k" if fmt == "mp3_320" else "192k"]
         dest = out / f"{stem}.{ext}"
         if dest.exists() and not item.get("force"):
             job.set_result(item, "skipped")
             continue
         job.set_result(item, "working")
+        volume = []
+        if settings["normalize"] and "copy" not in codec_args:  # copying can't change the volume
+            job.stage = "measuring"
+            if measured := loudness_filter(src):
+                volume = ["-af", measured[0], "-ar", str(measured[1])]
+            job.stage = "converting"
+        picture_in, picture = [], []
+        if cover and ext in COVER_EXTS:
+            picture_in = ["-i", cover]
+            picture = ["-map", "1:v:0", "-c:v", "mjpeg", *crop, "-disposition:v:0", "attached_pic"]
         tmp = out / f"{stem}.part.{ext}"  # renamed when complete, so a stopped run leaves no half file
-        cmd = [FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-               "-map", "0:a:0", "-map_metadata", "-1", *codec_args,  # drop the video container's own tags
+        cmd = [FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), *picture_in,
+               "-map", "0:a:0", *picture, "-map_metadata", "-1", *codec_args, *volume,  # no video-container tags
                "-metadata", f"title={display_name(item)}", *tags, str(tmp)]
         job.add_log("Converting " + src.name)
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, **TEXT)
@@ -748,7 +936,7 @@ def run_folder_job(job, settings):
             if job.cancel:
                 job.set_result(item, "stopped")
                 break
-            reason = "This file has no audio track." if "matches no streams" in err else (err.splitlines() or ["ffmpeg failed"])[-1]
+            reason = tr("This file has no audio track.") if "matches no streams" in err else (err.splitlines() or ["ffmpeg failed"])[-1]
             job.add_log(f"ERROR: {src.name}: {reason}")
             job.set_result(item, "failed", reason)
 
@@ -758,32 +946,45 @@ def run_folder_job(job, settings):
 def start_job(body):
     current = JOB["current"]
     if current and not current.finished:
-        raise UserError("A download is already running.")
+        raise UserError(tr("A download is already running."))
     if not FFMPEG:
-        raise UserError("ffmpeg is missing. Start the app again with Start.command, Start.bat or start.sh to install it.")
+        raise UserError(tr("ffmpeg is missing. Start the app again with Start.command, Start.bat or start.sh to install it."))
     mode = body.get("mode")
     items = [i for i in body.get("items") or [] if isinstance(i, dict) and i.get("id")]
     if mode not in ("youtube", "links", "albums", "folder") or not items:
-        raise UserError("Select at least one item.")
+        raise UserError(tr("Select at least one item."))
     settings = save_settings(body.get("settings") or {})
-    if settings["format"] not in ("mp3_320", "mp3_192", "original"):
-        raise UserError("Unknown format.")
+    if settings["format"] not in FORMATS:
+        raise UserError(tr("Unknown format."))
     out_dir(settings)
+    cover = (settings.get("cover") or "").strip()
+    if cover:
+        if not Path(cover).expanduser().is_file():
+            raise UserError(tr("The cover image wasn't found: {path}", path=cover))
+        settings["cover"] = str(Path(cover).expanduser())
     job = Job(mode, items)
     JOB["current"] = job
     runner = run_folder_job if mode == "folder" else run_youtube_job
+    lang = getattr(LANGUAGE, "lang", "en")
 
     def work():
+        LANGUAGE.lang = lang  # messages made during the job follow the page that started it
         try:
             runner(job, settings)
         except Exception as err:
             traceback.print_exc()
-            job.message = f"Something went wrong: {clean_error(err)}"
+            job.message = tr("Something went wrong: {error}", error=clean_error(err))
         finally:
             job.stage, job.finished = "", True
 
     threading.Thread(target=work, daemon=True).start()
     return {"started": True}
+
+
+def update_settings(body):
+    """Saves settings changed on the page right away (e.g. the language)."""
+    save_settings(body)
+    return {"ok": True}
 
 
 def cancel_job(_body):
@@ -797,34 +998,43 @@ def applescript_string(text):
 
 
 def choose_folder(body):
-    """Shows the system's own folder picker."""
-    prompt = str(body.get("prompt") or "Choose a folder")
+    """Shows the system's own folder picker, or with kind "image" its picker for a picture file."""
+    image = body.get("kind") == "image"
+    prompt = str(body.get("prompt") or "Choose")
     start = Path(str(body.get("start") or "")).expanduser()
+    start = start.parent if image and start.is_file() else start
     start = str(start) if start.is_dir() else ""
     env = None
     if sys.platform == "darwin":
-        script = f"POSIX path of (choose folder with prompt {applescript_string(prompt)}"
+        what = 'file of type {"public.image"}' if image else "folder"
+        script = f"POSIX path of (choose {what} with prompt {applescript_string(prompt)}"
         if start:
             script += f" default location (POSIX file {applescript_string(start)} as alias)"
         cmd = ["osascript", "-e", "activate", "-e", script + ")"]
     elif os.name == "nt":
         # Prompt and start folder go through the environment, so no quoting is needed
-        script = ("Add-Type -AssemblyName System.Windows.Forms;"
+        dialog = ("$d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = $env:YTMP3_PROMPT;"
+                  "$d.Filter = 'Images|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif'; $d.InitialDirectory = $env:YTMP3_START;"
+                  if image else
                   "$d = New-Object System.Windows.Forms.FolderBrowserDialog;"
-                  "$d.Description = $env:YTMP3_PROMPT; $d.SelectedPath = $env:YTMP3_START;"
+                  "$d.Description = $env:YTMP3_PROMPT; $d.SelectedPath = $env:YTMP3_START;")
+        script = ("Add-Type -AssemblyName System.Windows.Forms;" + dialog +
                   "$owner = New-Object System.Windows.Forms.Form -Property @{TopMost = $true};"
                   "[Console]::OutputEncoding = [Text.Encoding]::UTF8;"
-                  "if ($d.ShowDialog($owner) -eq 'OK') { $d.SelectedPath }")
+                  "if ($d.ShowDialog($owner) -eq 'OK') { if ($d.FileName) { $d.FileName } else { $d.SelectedPath } }")
         cmd = ["powershell", "-NoProfile", "-STA", "-Command", script]
         env = dict(os.environ, YTMP3_PROMPT=prompt, YTMP3_START=start)
     elif shutil.which("zenity"):
-        cmd = ["zenity", "--file-selection", "--directory", f"--title={prompt}"]
+        cmd = ["zenity", "--file-selection", f"--title={prompt}"]
+        cmd += ["--file-filter=Images | *.jpg *.jpeg *.png *.webp *.bmp *.gif"] if image else ["--directory"]
         if start:
             cmd.append(f"--filename={start}/")
     elif shutil.which("kdialog"):
-        cmd = ["kdialog", "--getexistingdirectory", start or str(Path.home()), "--title", prompt]
+        cmd = (["kdialog", "--getopenfilename", start or str(Path.home()), "*.jpg *.jpeg *.png *.webp *.bmp *.gif"]
+               if image else ["kdialog", "--getexistingdirectory", start or str(Path.home())])
+        cmd += ["--title", prompt]
     else:
-        raise UserError("No folder picker found on this computer. Type or paste the folder path instead.")
+        raise UserError(tr("No file picker found on this computer. Type or paste the path instead."))
     result = subprocess.run(cmd, capture_output=True, env=env, **TEXT)
     path = result.stdout.strip()  # empty when the user pressed Cancel
     return {"path": (path.rstrip("/\\") or path) or None}
@@ -833,7 +1043,7 @@ def choose_folder(body):
 def open_folder(body):
     path = Path(str(body.get("path") or "")).expanduser()
     if not path.is_dir():
-        raise UserError("That folder doesn't exist yet. It's created when the first song is saved.")
+        raise UserError(tr("That folder doesn't exist yet. It's created when the first song is saved."))
     if os.name == "nt":
         os.startfile(path)
     else:
@@ -863,6 +1073,7 @@ ROUTES = {
     "/api/scan_folder": scan_folder,
     "/api/start": start_job,
     "/api/cancel": cancel_job,
+    "/api/settings": update_settings,
     "/api/choose_folder": choose_folder,
     "/api/open_folder": open_folder,
 }
@@ -900,6 +1111,7 @@ class Handler(BaseHTTPRequestHandler):
         route = ROUTES.get(self.path)
         if not route:
             return self.send_body(404, {"error": "Not found"})
+        LANGUAGE.lang = "el" if self.headers.get("X-Lang") == "el" else "en"
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
             if not isinstance(body, dict):
@@ -912,7 +1124,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_body(400, {"error": str(err)})
         except Exception as err:
             traceback.print_exc()
-            self.send_body(500, {"error": f"Unexpected error: {clean_error(err)}"})
+            self.send_body(500, {"error": tr("Unexpected error: {error}", error=clean_error(err))})
 
 
 def self_test(online):
@@ -952,6 +1164,33 @@ def self_test(online):
             run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / fmt), format=fmt, artist="Test"))
             check(job.results.get(str(video)) == "ok" and (tmp / fmt / f"{video.stem}.{ext}").is_file(),
                   f"video file converted to .{ext}")
+
+        # Lossless formats; a quiet song evened out to -14 LUFS with the user's own (square) cover
+        for fmt in ("flac", "wav"):
+            job = Job("folder", [{"id": str(video), "title": video.stem}])
+            run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / fmt), format=fmt))
+            check(job.results.get(str(video)) == "ok" and (tmp / fmt / f"{video.stem}.{fmt}").is_file(),
+                  f"video file converted to .{fmt}")
+        quiet = tmp / "Quiet song.m4a"
+        subprocess.run([*lavfi, "sine=frequency=440:duration=6", "-af", "volume=-30dB", "-c:a", "aac", str(quiet)],
+                       check=True)
+        job = Job("folder", [{"id": str(quiet), "title": quiet.stem}])
+        run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / "even"), normalize=True, cover=str(thumb)))
+        even = tmp / "even" / "Quiet song.mp3"
+        measured = loudness_filter(even) if even.is_file() else None
+        level = float(re.search(r"measured_I=(-?[\d.]+)", measured[0]).group(1)) if measured else None
+        check(level is not None and abs(level + 14) < 1.5, f"volume evened out to -14 LUFS: {level}")
+        probe = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(even)], capture_output=True, **TEXT).stderr
+        check(re.search(r"Video: mjpeg.*, 720x720", probe) is not None, "own cover embedded, square")
+        for suffix in (".mp3", ".flac", ".m4a"):
+            song = tmp / f"lyrics{suffix}"
+            subprocess.run([*lavfi, "sine=duration=1", str(song)], check=True)
+            write_lyrics(song, "Line one\nLine two")
+            import mutagen
+            audio = mutagen.File(song)
+            text = (str(audio.tags.getall("USLT")[0]) if suffix == ".mp3"
+                    else (audio.tags.get("\xa9lyr" if suffix == ".m4a" else "LYRICS") or [""])[0])
+            check(text == "Line one\nLine two", f"lyrics saved in {suffix}")
 
         # A "live set" with three chapters becomes three numbered tracks
         live = tmp / "Live set.mp3"

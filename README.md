@@ -23,6 +23,8 @@ A small window stays open while the app works (close it to quit) and the app ope
 
 ## Use it
 
+The page is in English or Greek: switch with the flags at the top.
+
 1. Paste your channel link, e.g. `https://www.youtube.com/@yourname`, and press **Find videos**.
    Or open **Paste links** and paste the links of the videos or playlists you want, one per line
    (a whole message works too). Unlisted videos work there, as long as you have their link.
@@ -32,6 +34,9 @@ A small window stays open while the app works (close it to quit) and the app ope
    to tag songs that YouTube Music knows with their real title, artist, album and release date
    (it's off by default because YouTube can link a cover version to the original song).
    **Split videos with chapters** turns a live stream or concert into numbered songs.
+   Under **For the music itself** you can choose lossless FLAC or WAV, even out the volume of
+   all songs (-14 LUFS), use your own cover image, and save each video's description (your
+   lyrics or credits) as the song's lyrics.
 3. Optional: press **Tidy titles** to remove extras like "(Official Video)" or "[4K]" from the
    titles, or **Edit titles** to rename songs. Files are named and tagged with your titles.
 4. Press **Download**. A big channel takes hours. You can press **Stop** (or close the app) and

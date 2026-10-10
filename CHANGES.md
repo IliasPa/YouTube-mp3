@@ -3,6 +3,30 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.5 — 2026-10-10
+
+### Added
+
+- **Language switch** at the top of the page with flags: English 🇬🇧 or Greek 🇬🇷 (Ελληνικά). The
+  whole page and the app's messages are translated; the choice is remembered. On first start the
+  app follows the browser's language.
+- Settings → **For the music itself**:
+  - **Lossless formats**: FLAC (smaller) and WAV (for music software; WAV can't hold a cover).
+  - **Even out the volume**: every song at -14 LUFS, the loudness of streaming services. It's
+    measured first and applied as one even change while converting, so the music keeps its
+    dynamics and MP3s are only encoded once. Not with "Original audio", which isn't re-encoded.
+  - **Cover image**: your own picture (e.g. your logo or album artwork) for every song instead of
+    the video thumbnail; cropped to a square when "Square cover art" is on.
+  - **Save the video description as lyrics**, for your own lyrics or credits; Apple Music and most
+    players show it as the song's lyrics (MP3, M4A, FLAC, Opus).
+
+### Fixed
+
+- "Artist, album, track numbers and year come from each album" no longer shows outside the Album
+  links tab when the page opens.
+- Settings with a grey explanation no longer wrap into two columns; the Format menu matches the
+  other fields; example text in empty boxes is greyed out in dark mode.
+
 ## v0.4 — 2026-10-10
 
 ### Added

@@ -9,6 +9,7 @@
     --bg: #f5f3ef; --card: #ffffff; --text: #1c1b1a; --muted: #6b6862; --line: #e4e0d8; --soft: #efece6;
     --accent: #c8372d; --accent-hover: #a92c23; --accent-text: #ffffff;
     --ok: #1d7a46; --bad: #b3261e; --warn-bg: #fff3dc; --warn-text: #6e4300; --focus: #2b6cb0;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236b6862' stroke-width='1.6'/%3E%3C/svg%3E");
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -16,19 +17,29 @@
       --bg: #141413; --card: #1f1e1c; --text: #f1efea; --muted: #a29e96; --line: #34322e; --soft: #2a2926;
       --accent: #ef5b4f; --accent-hover: #ff7166; --accent-text: #1a0d0b;
       --ok: #5ccf8a; --bad: #ff7a70; --warn-bg: #3a2a10; --warn-text: #ffd28a; --focus: #7fb0f0;
+      --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23a29e96' stroke-width='1.6'/%3E%3C/svg%3E");
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); accent-color: var(--accent);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; }
   main { max-width: 860px; margin: 0 auto; padding: 32px 16px 40px; }
   h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
   h2 { font-size: 15px; margin: 0 0 12px; }
+  h3 { font-size: 12px; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .top { display: flex; gap: 8px 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 0 4px; }
+  .top h1 { margin: 0; }
   .sub { color: var(--muted); margin: 0 0 12px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .chip.bad { background: var(--warn-bg); color: var(--warn-text); }
+
+  .lang { display: flex; gap: 2px; background: var(--soft); padding: 3px; border-radius: 10px; flex: none; }
+  .lang button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 5px 9px;
+                 border-radius: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+  .lang button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .lang svg { border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
 
   .tabs { display: flex; gap: 4px; margin: 24px 0 12px; background: var(--soft); padding: 4px;
           border-radius: 12px; width: fit-content; max-width: 100%; flex-wrap: wrap; }
@@ -43,6 +54,9 @@
   input[type="text"], input[type="search"], textarea, select {
     width: 100%; font: inherit; color: var(--text); background: var(--bg);
     border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+  ::placeholder { color: var(--muted); opacity: .75; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 32px;
+           background: var(--bg) var(--chevron) no-repeat right 12px center; }
   textarea { resize: vertical; min-height: 44px; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .row > input { flex: 1; min-width: 180px; width: auto; }
@@ -50,14 +64,16 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
   .grid .wide { grid-column: 1 / -1; }
   @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
-  .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; color: var(--text); }
-  .check input { margin: 0; }
+  .check { display: flex; gap: 9px; align-items: flex-start; margin: 7px 0; font-size: 14px; color: var(--text); }
+  .check input { margin: 3px 0 0; flex: none; }
+  .row .check { margin: 0; align-items: center; }
+  .row .check input { margin: 0; }
   .muted { color: var(--muted); }
   .hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
   .error { color: var(--bad); font-size: 14px; margin: 10px 0 0; }
   .notice { background: var(--warn-bg); color: var(--warn-text); padding: 10px 12px; border-radius: 10px;
             font-size: 14px; margin: 10px 0 0; }
-  details summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 10px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 12px; }
   details .field { margin-top: 10px; }
 
   button { font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid var(--line);
@@ -67,6 +83,7 @@
   button.primary:hover:not(:disabled) { background: var(--accent-hover); }
   button.big { padding: 10px 20px; font-size: 16px; }
   button.link { border: 0; background: none; color: var(--accent); padding: 2px 4px; }
+  button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
   button:disabled { opacity: .5; cursor: default; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
@@ -77,12 +94,11 @@
   td.c { width: 34px; }
   td.t label { display: block; cursor: pointer; word-break: break-word; }
   td.m { color: var(--muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  td.s { width: 120px; white-space: nowrap; font-size: 13px; color: var(--muted); }
+  td.s { width: 130px; white-space: nowrap; font-size: 13px; color: var(--muted); }
   .s-ok { color: var(--ok); } .s-failed { color: var(--bad); } .s-working { color: var(--accent); font-weight: 600; }
   input.title-edit { padding: 4px 8px; }
   .edited { font-size: 11px; color: var(--accent); margin-left: 6px; cursor: help; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--soft); color: var(--muted); margin-left: 6px; }
-  .empty { padding: 18px; text-align: center; color: var(--muted); }
 
   .sticky { position: sticky; bottom: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
   .bar { height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; margin: 10px 0 6px; }
@@ -96,126 +112,158 @@
 <body>
 <main>
   <header>
-    <h1>YouTube → MP3</h1>
-    <p class="sub">Save the audio of your uploads as music files, with title, date, artist and cover art.</p>
+    <div class="top">
+      <h1>YouTube → MP3</h1>
+      <div class="lang" role="group" data-i18n-aria="language" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true" title="English">
+          <svg viewBox="0 0 60 30" width="21" height="14" aria-hidden="true">
+            <clipPath id="uk-t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath>
+            <path d="M0,0 v30 h60 v-30 z" fill="#012169"/>
+            <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>
+            <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#uk-t)" stroke="#C8102E" stroke-width="4"/>
+            <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>
+            <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/>
+          </svg>EN</button>
+        <button type="button" data-lang="el" aria-pressed="false" title="Ελληνικά">
+          <svg viewBox="0 0 27 18" width="21" height="14" aria-hidden="true">
+            <rect width="27" height="18" fill="#0D5EAF"/>
+            <path d="M0,3h27M0,7h27M0,11h27M0,15h27" stroke="#fff" stroke-width="2"/>
+            <rect width="10" height="10" fill="#0D5EAF"/>
+            <path d="M5,0v10M0,5h10" stroke="#fff" stroke-width="2"/>
+          </svg>ΕΛ</button>
+      </div>
+    </div>
+    <p class="sub" data-i18n="subtitle">Save the audio of your uploads as music files, with title, date, artist and cover art.</p>
     <div id="tools" class="chips"></div>
     <div class="notice row" id="update" hidden>
       <span id="update-text"></span>
       <span class="spacer"></span>
-      <button type="button" class="link" id="update-close" aria-label="Hide this notice">✕</button>
+      <button type="button" class="link" id="update-close" data-i18n-aria="hide_notice" aria-label="Hide this notice">✕</button>
     </div>
   </header>
 
   <div class="tabs" role="tablist">
-    <button role="tab" data-mode="youtube" aria-selected="true">From my YouTube channel</button>
-    <button role="tab" data-mode="links" aria-selected="false">Paste links</button>
-    <button role="tab" data-mode="albums" aria-selected="false">Album links</button>
-    <button role="tab" data-mode="folder" aria-selected="false">From video files on this computer</button>
+    <button role="tab" data-mode="youtube" aria-selected="true" data-i18n="tab_channel">From my YouTube channel</button>
+    <button role="tab" data-mode="links" aria-selected="false" data-i18n="tab_links">Paste links</button>
+    <button role="tab" data-mode="albums" aria-selected="false" data-i18n="tab_albums">Album links</button>
+    <button role="tab" data-mode="folder" aria-selected="false" data-i18n="tab_folder">From video files on this computer</button>
   </div>
 
   <section class="card" id="src-youtube">
     <fieldset class="lockable">
-      <label class="field">Your channel link
+      <label class="field"><span data-i18n="channel_label">Your channel link</span>
         <input id="url" type="text" placeholder="https://www.youtube.com/@yourchannel">
       </label>
       <div class="row">
-        <span class="muted">Include:</span>
-        <label class="check"><input type="checkbox" name="tab" value="videos"> Videos</label>
-        <label class="check"><input type="checkbox" name="tab" value="streams"> Live streams</label>
-        <label class="check"><input type="checkbox" name="tab" value="shorts"> Shorts</label>
+        <span class="muted" data-i18n="include">Include:</span>
+        <label class="check"><input type="checkbox" name="tab" value="videos"> <span data-i18n="videos">Videos</span></label>
+        <label class="check"><input type="checkbox" name="tab" value="streams"> <span data-i18n="streams">Live streams</span></label>
+        <label class="check"><input type="checkbox" name="tab" value="shorts"> <span data-i18n="shorts">Shorts</span></label>
         <span class="spacer"></span>
-        <button id="scan-youtube" class="primary">Find videos</button>
+        <button id="scan-youtube" class="primary" data-i18n="find_videos">Find videos</button>
       </div>
-      <p class="hint">Only <strong>public</strong> videos are listed. For unlisted ones, paste their links in
-        <strong>Paste links</strong>. For private ones, export your channel with
-        <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> and use the last tab.</p>
+      <p class="hint" data-i18n-html="channel_hint"></p>
       <p class="error" id="scan-youtube-error" hidden></p>
     </fieldset>
   </section>
 
   <section class="card" id="src-links" hidden>
     <fieldset class="lockable">
-      <label class="field">YouTube links: videos, Shorts or playlists, one per line
+      <label class="field"><span data-i18n="links_label">YouTube links: videos, Shorts or playlists, one per line</span>
         <textarea id="links" rows="7" placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…&#10;https://www.youtube.com/playlist?list=…"></textarea>
       </label>
       <div class="row">
         <span class="muted" id="links-count"></span>
         <span class="spacer"></span>
-        <button id="scan-links" class="primary">Find videos</button>
+        <button id="scan-links" class="primary" data-i18n="find_videos">Find videos</button>
       </div>
-      <p class="hint">You can paste a whole message or list: the links are picked out of the text. Unlisted
-        videos work too, as long as you have their link.</p>
+      <p class="hint" data-i18n="links_hint"></p>
       <p class="error" id="scan-links-error" hidden></p>
     </fieldset>
   </section>
 
   <section class="card" id="src-albums" hidden>
     <fieldset class="lockable">
-      <label class="field">YouTube Music album links, one per line
+      <label class="field"><span data-i18n="albums_label">YouTube Music album links, one per line</span>
         <textarea id="albums" rows="5" placeholder="https://music.youtube.com/playlist?list=OLAK5uy_…&#10;https://music.youtube.com/browse/MPREb_…"></textarea>
       </label>
       <div class="row">
         <span class="muted" id="albums-count"></span>
         <span class="spacer"></span>
-        <button id="scan-albums" class="primary">Find albums</button>
+        <button id="scan-albums" class="primary" data-i18n="find_albums">Find albums</button>
       </div>
-      <p class="hint">Open the album on <a href="https://music.youtube.com" target="_blank" rel="noopener">YouTube Music</a>
-        and copy its link (Share → Copy link). Each album is saved in its own folder, with numbered tracks,
-        the album's title, artist and year, and its cover. Other YouTube playlists work as albums too.</p>
+      <p class="hint" data-i18n-html="albums_hint"></p>
       <p class="error" id="scan-albums-error" hidden></p>
     </fieldset>
   </section>
 
   <section class="card" id="src-folder" hidden>
     <fieldset class="lockable">
-      <label class="field">Folder with your video files (e.g. an unzipped Google Takeout export)
+      <label class="field"><span data-i18n="folder_label">Folder with your video files (e.g. an unzipped Google Takeout export)</span>
         <span class="row"><input id="folder" type="text" placeholder="/Users/you/Downloads/Takeout">
-          <button type="button" data-choose="folder">Choose…</button></span>
+          <button type="button" data-choose="folder" data-i18n="choose">Choose…</button></span>
       </label>
-      <div class="row"><span class="spacer"></span><button id="scan-folder" class="primary">Find files</button></div>
+      <div class="row"><span class="spacer"></span><button id="scan-folder" class="primary" data-i18n="find_files">Find files</button></div>
       <p class="error" id="scan-folder-error" hidden></p>
     </fieldset>
   </section>
 
   <section class="card">
     <fieldset class="lockable">
-      <h2>Settings</h2>
+      <h2 data-i18n="settings">Settings</h2>
       <div class="grid">
-        <label class="field wide">Save to
+        <label class="field wide"><span data-i18n="save_to">Save to</span>
           <span class="row"><input id="out" type="text">
-            <button type="button" data-choose="out">Choose…</button>
-            <button type="button" id="open-out">Open</button></span>
+            <button type="button" data-choose="out" data-i18n="choose">Choose…</button>
+            <button type="button" id="open-out" data-i18n="open">Open</button></span>
         </label>
-        <label class="field">Format
+        <label class="field"><span data-i18n="format">Format</span>
           <select id="format">
-            <option value="mp3_320">MP3 · 320 kbps (best quality)</option>
-            <option value="mp3_192">MP3 · 192 kbps (smaller files)</option>
-            <option value="original">Original audio, no conversion</option>
+            <option value="mp3_320" data-i18n="fmt_mp3_320">MP3 · 320 kbps (best quality)</option>
+            <option value="mp3_192" data-i18n="fmt_mp3_192">MP3 · 192 kbps (smaller files)</option>
+            <option value="flac" data-i18n="fmt_flac">FLAC · lossless (smaller than WAV)</option>
+            <option value="wav" data-i18n="fmt_wav">WAV · lossless (for music software, no cover)</option>
+            <option value="original" data-i18n="fmt_original">Original audio, no conversion</option>
           </select>
         </label>
-        <label class="field not-albums">Artist
-          <input id="artist" type="text" placeholder="Your artist name">
+        <label class="field not-albums"><span data-i18n="artist">Artist</span>
+          <input id="artist" type="text" data-i18n-placeholder="artist_placeholder" placeholder="Your artist name">
         </label>
-        <label class="field wide not-albums">Album
+        <label class="field wide not-albums"><span data-i18n="album">Album</span>
           <input id="album" type="text" placeholder="YouTube Archive">
         </label>
-        <p class="hint albums-only" style="margin:0 0 12px">Artist, album, track numbers and year come from each album.</p>
+        <p class="hint wide albums-only" style="margin:0 0 12px" data-i18n="albums_details" hidden></p>
       </div>
-      <label class="check yt-only not-albums"><input type="checkbox" id="song_tags"> Use the song's own details when
-        YouTube Music knows the song <span class="muted">(title, artist, album, release date; other videos keep
-        their title and the Artist and Album above)</span></label>
-      <label class="check yt-only not-albums"><input type="checkbox" id="split_chapters"> Split videos with chapters
-        into separate songs <span class="muted">(e.g. a live stream or concert: numbered tracks in a folder named
-        after the video)</span></label>
-      <label class="check yt-only not-albums"><input type="checkbox" id="date_prefix"> Start file names with the upload date
-        <span class="muted">(2021-03-14 - Song title.mp3)</span></label>
-      <label class="check yt-only"><input type="checkbox" id="square_cover"> Square cover art
-        <span class="muted">(crop the video thumbnail)</span></label>
+
+      <div class="yt-only not-albums">
+        <h3 data-i18n="group_tags">Tags and files</h3>
+        <label class="check"><input type="checkbox" id="song_tags">
+          <span><span data-i18n="song_tags"></span> <span class="muted" data-i18n="song_tags_hint"></span></span></label>
+        <label class="check"><input type="checkbox" id="split_chapters">
+          <span><span data-i18n="split"></span> <span class="muted" data-i18n="split_hint"></span></span></label>
+        <label class="check"><input type="checkbox" id="date_prefix">
+          <span><span data-i18n="date_prefix"></span> <span class="muted" data-i18n="date_prefix_hint"></span></span></label>
+      </div>
+
+      <h3 data-i18n="group_music">For the music itself</h3>
+      <label class="check"><input type="checkbox" id="normalize">
+        <span><span data-i18n="normalize"></span> <span class="muted" data-i18n="normalize_hint"></span></span></label>
+      <label class="check yt-only"><input type="checkbox" id="lyrics">
+        <span><span data-i18n="lyrics"></span> <span class="muted" data-i18n="lyrics_hint"></span></span></label>
+      <label class="check"><input type="checkbox" id="square_cover">
+        <span><span data-i18n="square_cover"></span> <span class="muted" data-i18n="square_cover_hint"></span></span></label>
+      <label class="field" style="margin-top:10px"><span data-i18n="cover_label">Cover image</span>
+        <span class="row"><input id="cover" type="text" data-i18n-placeholder="cover_placeholder">
+          <button type="button" data-choose="cover" data-i18n="choose">Choose…</button>
+          <button type="button" id="cover-clear" data-i18n="clear">Clear</button></span>
+      </label>
+      <p class="hint" style="margin-top:-6px" data-i18n="cover_hint"></p>
+
       <details class="yt-only">
-        <summary>If YouTube blocks the downloads</summary>
-        <label class="field">Use my YouTube login from this browser
+        <summary data-i18n="blocks_summary">If YouTube blocks the downloads</summary>
+        <label class="field"><span data-i18n="cookies_label">Use my YouTube login from this browser</span>
           <select id="cookies">
-            <option value="">Don't use (normal)</option>
+            <option value="" data-i18n="cookies_none">Don't use (normal)</option>
             <option value="chrome">Chrome</option>
             <option value="safari">Safari</option>
             <option value="firefox">Firefox</option>
@@ -223,8 +271,7 @@
             <option value="edge">Edge</option>
           </select>
         </label>
-        <p class="hint">Only needed if songs fail with “Sign in to confirm you’re not a bot”. You must be signed in to
-          YouTube in that browser. Safari also needs Full Disk Access for Terminal (System Settings → Privacy &amp; Security).</p>
+        <p class="hint" data-i18n="cookies_hint"></p>
       </details>
     </fieldset>
   </section>
@@ -232,23 +279,23 @@
   <section class="card" id="list-card" hidden>
     <fieldset class="lockable">
       <div class="row">
-        <h2 id="list-title" style="margin:0">Videos</h2>
+        <h2 id="list-title" style="margin:0"></h2>
         <span class="spacer"></span>
-        <input id="filter" type="search" placeholder="Filter by title" style="max-width:260px">
+        <input id="filter" type="search" data-i18n-placeholder="filter" style="max-width:260px">
       </div>
       <div class="row" style="margin-top:8px">
-        <span class="muted">Select:</span>
-        <button type="button" class="link" data-select="new">Not saved yet</button>
-        <button type="button" class="link" data-select="all">All</button>
-        <button type="button" class="link" data-select="none">None</button>
+        <span class="muted" data-i18n="select">Select:</span>
+        <button type="button" class="link" data-select="new" data-i18n="sel_new">Not saved yet</button>
+        <button type="button" class="link" data-select="all" data-i18n="sel_all">All</button>
+        <button type="button" class="link" data-select="none" data-i18n="sel_none">None</button>
         <span class="spacer"></span>
         <span id="sel-count" class="muted"></span>
       </div>
       <div class="row" style="margin-top:4px">
-        <span class="muted">Titles:</span>
-        <button type="button" class="link" id="tidy-titles" title="Removes extras like (Official Video), [4K], | Live at…, #hashtags and your artist name">Tidy titles</button>
-        <button type="button" class="link" id="edit-titles" aria-pressed="false">Edit titles</button>
-        <button type="button" class="link" id="reset-titles" hidden>Undo title changes</button>
+        <span class="muted" data-i18n="titles">Titles:</span>
+        <button type="button" class="link" id="tidy-titles" data-i18n="tidy" data-i18n-title="tidy_tip">Tidy titles</button>
+        <button type="button" class="link" id="edit-titles" aria-pressed="false"></button>
+        <button type="button" class="link" id="reset-titles" data-i18n="reset_titles" hidden>Undo title changes</button>
       </div>
       <div class="notice" id="problems" hidden></div>
       <div class="table-wrap"><table><tbody id="rows"></tbody></table></div>
@@ -259,16 +306,16 @@
     <div class="row" id="start-row">
       <span class="muted" id="start-hint"></span>
       <span class="spacer"></span>
-      <button id="start" class="primary big">Download</button>
+      <button id="start" class="primary big"></button>
     </div>
     <div id="progress" hidden>
-      <div class="row"><strong id="p-count"></strong><span class="spacer"></span><button id="stop">Stop</button></div>
+      <div class="row"><strong id="p-count"></strong><span class="spacer"></span><button id="stop"></button></div>
       <div class="bar"><div id="p-bar"></div></div>
       <div id="p-current" class="muted"></div>
     </div>
     <div id="summary" hidden></div>
     <p class="error" id="start-error" hidden></p>
-    <details id="log-box"><summary>Details</summary><pre id="log"></pre></details>
+    <details id="log-box"><summary data-i18n="details">Details</summary><pre id="log"></pre></details>
   </section>
 </main>
 
@@ -276,24 +323,310 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const STATUS = { working: "Saving…", ok: "Saved ✓", skipped: "Already saved", failed: "Failed", stopped: "Stopped" };
+
+// ---------- language ----------
+// English and Greek. A value is a string with {placeholders} or a function for plurals.
+// Strings marked _html contain trusted markup written here, never user data.
+
+const plural = (n, one, many) => (n === 1 ? one : many);
+const I18N = {
+  en: {
+    subtitle: "Save the audio of your uploads as music files, with title, date, artist and cover art.",
+    language: "Language",
+    update: ({ version }) => `Version ${version} is available, with the newest fixes for YouTube downloads.`,
+    update_link: "Download it",
+    hide_notice: "Hide this notice",
+    no_ffmpeg: "ffmpeg missing: start the app again to install it",
+    no_js: "No JavaScript runtime: YouTube downloads may fail",
+    tab_channel: "From my YouTube channel",
+    tab_links: "Paste links",
+    tab_albums: "Album links",
+    tab_folder: "From video files on this computer",
+    channel_label: "Your channel link",
+    include: "Include:",
+    videos: "Videos",
+    streams: "Live streams",
+    shorts: "Shorts",
+    find_videos: "Find videos",
+    channel_hint: 'Only <strong>public</strong> videos are listed. For unlisted ones, paste their links in <strong>Paste links</strong>. For private ones, export your channel with <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> and use the last tab.',
+    busy_channel: "Reading your channel… (big channels take a minute)",
+    links_label: "YouTube links: videos, Shorts or playlists, one per line",
+    links_hint: "You can paste a whole message or list: the links are picked out of the text. Unlisted videos work too, as long as you have their link.",
+    links_found: ({ n }) => `${n} ${plural(n, "link", "links")} found`,
+    busy_links: "Reading the links…",
+    albums_label: "YouTube Music album links, one per line",
+    find_albums: "Find albums",
+    albums_hint: 'Open the album on <a href="https://music.youtube.com" target="_blank" rel="noopener">YouTube Music</a> and copy its link (Share → Copy link). Each album is saved in its own folder, with numbered tracks, the album\'s title, artist and year, and its cover. Other YouTube playlists work as albums too.',
+    busy_albums: "Reading the albums…",
+    folder_label: "Folder with your video files (e.g. an unzipped Google Takeout export)",
+    choose: "Choose…",
+    find_files: "Find files",
+    busy_folder: "Looking for files…",
+    settings: "Settings",
+    save_to: "Save to",
+    open: "Open",
+    format: "Format",
+    fmt_mp3_320: "MP3 · 320 kbps (best quality)",
+    fmt_mp3_192: "MP3 · 192 kbps (smaller files)",
+    fmt_flac: "FLAC · lossless (smaller than WAV)",
+    fmt_wav: "WAV · lossless (for music software, no cover)",
+    fmt_original: "Original audio, no conversion",
+    artist: "Artist",
+    artist_placeholder: "Your artist name",
+    album: "Album",
+    albums_details: "Artist, album, track numbers and year come from each album.",
+    group_tags: "Tags and files",
+    song_tags: "Use the song's own details when YouTube Music knows the song",
+    song_tags_hint: "(title, artist, album, release date; other videos keep their title and the Artist and Album above)",
+    split: "Split videos with chapters into separate songs",
+    split_hint: "(e.g. a live stream or concert: numbered tracks in a folder named after the video)",
+    date_prefix: "Start file names with the upload date",
+    date_prefix_hint: "(2021-03-14 - Song title.mp3)",
+    group_music: "For the music itself",
+    normalize: "Even out the volume",
+    normalize_hint: "(every song as loud as on streaming services, −14 LUFS, in one even step that keeps the dynamics; not with Original audio)",
+    lyrics: "Save the video description as lyrics",
+    lyrics_hint: "(for your own lyrics or credits; shown in Apple Music and most players)",
+    square_cover: "Square cover art",
+    square_cover_hint: "(crop the picture to a square)",
+    cover_label: "Cover image",
+    cover_placeholder: "Empty: the video thumbnail",
+    clear: "Clear",
+    cover_hint: "Your own picture for every song, e.g. your logo or album artwork. Not for WAV.",
+    blocks_summary: "If YouTube blocks the downloads",
+    cookies_label: "Use my YouTube login from this browser",
+    cookies_none: "Don't use (normal)",
+    cookies_hint: "Only needed if songs fail with “Sign in to confirm you’re not a bot”. You must be signed in to YouTube in that browser. Safari also needs Full Disk Access for Terminal (System Settings → Privacy & Security).",
+    filter: "Filter by title",
+    select: "Select:",
+    sel_new: "Not saved yet",
+    sel_all: "All",
+    sel_none: "None",
+    titles: "Titles:",
+    tidy: "Tidy titles",
+    tidy_tip: "Removes extras like (Official Video), [4K], | Live at…, #hashtags and your artist name",
+    edit_titles: "Edit titles",
+    done_editing: "Done editing",
+    reset_titles: "Undo title changes",
+    edited: "edited",
+    title: "Title",
+    problems: "Some links couldn't be read:",
+    found: ({ n, kind, albums, saved }) => {
+      const noun = { files: plural(n, "file", "files"), tracks: plural(n, "track", "tracks") }[kind] || plural(n, "video", "videos");
+      return `${n} ${noun}` + (albums ? ` in ${albums} ${plural(albums, "album", "albums")}` : "") + " found" +
+        (saved ? ` · ${saved} already saved` : "");
+    },
+    selected: ({ n, extra }) => `${n} selected · ${extra}`,
+    hours: ({ h, m }) => `${h} h ${m} min`,
+    minutes: ({ m }) => `${m} min`,
+    resave_hint: ({ n }) => `${n} already saved: they're only downloaded again if the file is gone.`,
+    download_n: ({ n }) => `Download ${n} ${plural(n, "song", "songs")}`,
+    convert_n: ({ n }) => `Convert ${n} ${plural(n, "file", "files")}`,
+    status_working: "Saving…",
+    status_ok: "Saved ✓",
+    status_skipped: "Already saved",
+    status_failed: "Failed",
+    status_stopped: "Stopped",
+    stop: "Stop",
+    stopping: "Stopping…",
+    progress: ({ i, n }) => `${i} of ${n}`,
+    stage_starting: "Starting",
+    stage_downloading: "Downloading",
+    stage_converting: "Converting",
+    stage_measuring: "Measuring the volume",
+    stage_pausing: "Pausing a few seconds (keeps YouTube happy)",
+    stage_working: "Working",
+    lost_contact: "Lost contact with the app. Is its window still open?",
+    finished: "Finished!",
+    stopped: "Stopped.",
+    n_saved: ({ n }) => `${n} saved`,
+    n_there: ({ n }) => `${n} ${plural(n, "was", "were")} already there`,
+    n_failed: ({ n }) => `${n} failed`,
+    open_folder: "Open folder",
+    retry_hint: "Failed songs stay ticked. Press Download again to retry them.",
+    details: "Details",
+    nothing_yet: "(nothing yet)",
+    cant_reach: "Can't reach the app. Start it again.",
+    went_wrong: ({ status }) => `Something went wrong (${status})`,
+    prompt_out: "Where should the songs be saved?",
+    prompt_folder: "Choose the folder with your video files",
+    prompt_cover: "Choose a cover image",
+  },
+  el: {
+    subtitle: "Αποθηκεύστε τον ήχο των βίντεό σας ως αρχεία μουσικής, με τίτλο, ημερομηνία, καλλιτέχνη και εξώφυλλο.",
+    language: "Γλώσσα",
+    update: ({ version }) => `Η έκδοση ${version} είναι διαθέσιμη, με τις πιο πρόσφατες διορθώσεις για τις λήψεις από το YouTube.`,
+    update_link: "Λήψη",
+    hide_notice: "Απόκρυψη της ειδοποίησης",
+    no_ffmpeg: "Λείπει το ffmpeg: ανοίξτε ξανά την εφαρμογή για να εγκατασταθεί",
+    no_js: "Δεν βρέθηκε JavaScript runtime: οι λήψεις από το YouTube ίσως αποτύχουν",
+    tab_channel: "Από το κανάλι μου στο YouTube",
+    tab_links: "Επικόλληση συνδέσμων",
+    tab_albums: "Σύνδεσμοι άλμπουμ",
+    tab_folder: "Από αρχεία βίντεο στον υπολογιστή",
+    channel_label: "Ο σύνδεσμος του καναλιού σας",
+    include: "Να συμπεριληφθούν:",
+    videos: "Βίντεο",
+    streams: "Ζωντανές μεταδόσεις",
+    shorts: "Shorts",
+    find_videos: "Εύρεση βίντεο",
+    channel_hint: 'Εμφανίζονται μόνο τα <strong>δημόσια</strong> βίντεο. Για τα μη καταχωρισμένα, επικολλήστε τους συνδέσμους τους στην <strong>Επικόλληση συνδέσμων</strong>. Για τα ιδιωτικά, εξαγάγετε το κανάλι σας με το <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> και χρησιμοποιήστε την τελευταία καρτέλα.',
+    busy_channel: "Ανάγνωση του καναλιού… (τα μεγάλα κανάλια θέλουν ένα λεπτό)",
+    links_label: "Σύνδεσμοι YouTube: βίντεο, Shorts ή λίστες αναπαραγωγής, ένας ανά γραμμή",
+    links_hint: "Μπορείτε να επικολλήσετε ολόκληρο μήνυμα ή λίστα: οι σύνδεσμοι εντοπίζονται μέσα στο κείμενο. Λειτουργούν και τα μη καταχωρισμένα βίντεο, αρκεί να έχετε τον σύνδεσμό τους.",
+    links_found: ({ n }) => (n === 1 ? "Βρέθηκε 1 σύνδεσμος" : `Βρέθηκαν ${n} σύνδεσμοι`),
+    busy_links: "Ανάγνωση των συνδέσμων…",
+    albums_label: "Σύνδεσμοι άλμπουμ του YouTube Music, ένας ανά γραμμή",
+    find_albums: "Εύρεση άλμπουμ",
+    albums_hint: 'Ανοίξτε το άλμπουμ στο <a href="https://music.youtube.com" target="_blank" rel="noopener">YouTube Music</a> και αντιγράψτε τον σύνδεσμό του (Κοινοποίηση → Αντιγραφή συνδέσμου). Κάθε άλμπουμ αποθηκεύεται στον δικό του φάκελο, με αριθμημένα κομμάτια, τον τίτλο, τον καλλιτέχνη και τη χρονιά του άλμπουμ και το εξώφυλλό του. Και άλλες λίστες αναπαραγωγής του YouTube λειτουργούν ως άλμπουμ.',
+    busy_albums: "Ανάγνωση των άλμπουμ…",
+    folder_label: "Φάκελος με τα αρχεία βίντεο (π.χ. μια αποσυμπιεσμένη εξαγωγή του Google Takeout)",
+    choose: "Επιλογή…",
+    find_files: "Εύρεση αρχείων",
+    busy_folder: "Αναζήτηση αρχείων…",
+    settings: "Ρυθμίσεις",
+    save_to: "Αποθήκευση σε",
+    open: "Άνοιγμα",
+    format: "Μορφή",
+    fmt_mp3_320: "MP3 · 320 kbps (καλύτερη ποιότητα)",
+    fmt_mp3_192: "MP3 · 192 kbps (μικρότερα αρχεία)",
+    fmt_flac: "FLAC · χωρίς απώλειες (μικρότερο από το WAV)",
+    fmt_wav: "WAV · χωρίς απώλειες (για προγράμματα μουσικής, χωρίς εξώφυλλο)",
+    fmt_original: "Αρχικός ήχος, χωρίς μετατροπή",
+    artist: "Καλλιτέχνης",
+    artist_placeholder: "Το καλλιτεχνικό σας όνομα",
+    album: "Άλμπουμ",
+    albums_details: "Ο καλλιτέχνης, το άλμπουμ, οι αριθμοί των κομματιών και η χρονιά προέρχονται από κάθε άλμπουμ.",
+    group_tags: "Ετικέτες και αρχεία",
+    song_tags: "Χρήση των στοιχείων του τραγουδιού, όταν το YouTube Music το γνωρίζει",
+    song_tags_hint: "(τίτλος, καλλιτέχνης, άλμπουμ, ημερομηνία κυκλοφορίας· τα υπόλοιπα βίντεο κρατούν τον τίτλο τους και τον Καλλιτέχνη και το Άλμπουμ από πάνω)",
+    split: "Χωρισμός βίντεο με κεφάλαια σε ξεχωριστά τραγούδια",
+    split_hint: "(π.χ. ζωντανή μετάδοση ή συναυλία: αριθμημένα κομμάτια σε φάκελο με το όνομα του βίντεο)",
+    date_prefix: "Η ημερομηνία ανεβάσματος στην αρχή του ονόματος αρχείου",
+    date_prefix_hint: "(2021-03-14 - Τίτλος τραγουδιού.mp3)",
+    group_music: "Για την ίδια τη μουσική",
+    normalize: "Εξίσωση της έντασης",
+    normalize_hint: "(κάθε τραγούδι στην ένταση των υπηρεσιών streaming, −14 LUFS, με μία ομοιόμορφη αλλαγή που κρατά τη δυναμική· όχι με τον Αρχικό ήχο)",
+    lyrics: "Αποθήκευση της περιγραφής του βίντεο ως στίχων",
+    lyrics_hint: "(για τους δικούς σας στίχους ή τους συντελεστές· εμφανίζονται στο Apple Music και στις περισσότερες εφαρμογές)",
+    square_cover: "Τετράγωνο εξώφυλλο",
+    square_cover_hint: "(περικοπή της εικόνας σε τετράγωνο)",
+    cover_label: "Εικόνα εξωφύλλου",
+    cover_placeholder: "Κενό: η μικρογραφία του βίντεο",
+    clear: "Καθαρισμός",
+    cover_hint: "Η δική σας εικόνα για κάθε τραγούδι, π.χ. το λογότυπό σας ή το εξώφυλλο του άλμπουμ. Όχι για WAV.",
+    blocks_summary: "Αν το YouTube μπλοκάρει τις λήψεις",
+    cookies_label: "Χρήση της σύνδεσής μου στο YouTube από αυτόν τον περιηγητή",
+    cookies_none: "Να μη χρησιμοποιηθεί (κανονικά)",
+    cookies_hint: "Χρειάζεται μόνο αν τα τραγούδια αποτυγχάνουν με το μήνυμα «Sign in to confirm you’re not a bot». Πρέπει να είστε συνδεδεμένοι στο YouTube σε αυτόν τον περιηγητή. Το Safari χρειάζεται επίσης Πλήρη πρόσβαση στον δίσκο για το Τερματικό (Ρυθμίσεις συστήματος → Απόρρητο και ασφάλεια).",
+    filter: "Φιλτράρισμα κατά τίτλο",
+    select: "Επιλογή:",
+    sel_new: "Όσα δεν έχουν αποθηκευτεί",
+    sel_all: "Όλα",
+    sel_none: "Κανένα",
+    titles: "Τίτλοι:",
+    tidy: "Τακτοποίηση τίτλων",
+    tidy_tip: "Αφαιρεί περιττά, όπως (Official Video), [4K], | Live at…, #hashtags και το όνομά σας στην αρχή",
+    edit_titles: "Επεξεργασία τίτλων",
+    done_editing: "Τέλος επεξεργασίας",
+    reset_titles: "Αναίρεση αλλαγών τίτλων",
+    edited: "αλλαγμένος",
+    title: "Τίτλος",
+    problems: "Ορισμένοι σύνδεσμοι δεν διαβάστηκαν:",
+    found: ({ n, kind, albums, saved }) => {
+      const noun = { files: plural(n, "αρχείο", "αρχεία"), tracks: plural(n, "κομμάτι", "κομμάτια") }[kind] || "βίντεο";
+      return `${plural(n, "Βρέθηκε", "Βρέθηκαν")} ${n} ${noun}` + (albums ? ` σε ${albums} άλμπουμ` : "") +
+        (saved ? ` · ${saved} ${plural(saved, "ήδη αποθηκευμένο", "ήδη αποθηκευμένα")}` : "");
+    },
+    selected: ({ n, extra }) => `${n} ${plural(n, "επιλεγμένο", "επιλεγμένα")} · ${extra}`,
+    hours: ({ h, m }) => `${h} ώρ. ${m} λεπ.`,
+    minutes: ({ m }) => `${m} λεπ.`,
+    resave_hint: ({ n }) => `${n} ${plural(n, "είναι ήδη αποθηκευμένο", "είναι ήδη αποθηκευμένα")}: θα κατέβουν ξανά μόνο αν λείπει το αρχείο.`,
+    download_n: ({ n }) => `Λήψη ${n} ${plural(n, "τραγουδιού", "τραγουδιών")}`,
+    convert_n: ({ n }) => `Μετατροπή ${n} ${plural(n, "αρχείου", "αρχείων")}`,
+    status_working: "Αποθήκευση…",
+    status_ok: "Αποθηκεύτηκε ✓",
+    status_skipped: "Ήδη αποθηκευμένο",
+    status_failed: "Απέτυχε",
+    status_stopped: "Διακόπηκε",
+    stop: "Διακοπή",
+    stopping: "Διακοπή…",
+    progress: ({ i, n }) => `${i} από ${n}`,
+    stage_starting: "Έναρξη",
+    stage_downloading: "Λήψη",
+    stage_converting: "Μετατροπή",
+    stage_measuring: "Μέτρηση της έντασης",
+    stage_pausing: "Μικρή παύση (για να μη μας μπλοκάρει το YouTube)",
+    stage_working: "Σε εξέλιξη",
+    lost_contact: "Χάθηκε η επικοινωνία με την εφαρμογή. Είναι ακόμη ανοιχτό το παράθυρό της;",
+    finished: "Ολοκληρώθηκε!",
+    stopped: "Διακόπηκε.",
+    n_saved: ({ n }) => `${n} ${plural(n, "αποθηκεύτηκε", "αποθηκεύτηκαν")}`,
+    n_there: ({ n }) => `${n} ${plural(n, "υπήρχε", "υπήρχαν")} ήδη`,
+    n_failed: ({ n }) => `${n} ${plural(n, "απέτυχε", "απέτυχαν")}`,
+    open_folder: "Άνοιγμα φακέλου",
+    retry_hint: "Τα τραγούδια που απέτυχαν μένουν επιλεγμένα. Πατήστε ξανά «Λήψη» για να ξαναδοκιμάσετε.",
+    details: "Λεπτομέρειες",
+    nothing_yet: "(τίποτα ακόμη)",
+    cant_reach: "Δεν υπάρχει επικοινωνία με την εφαρμογή. Ανοίξτε την ξανά.",
+    went_wrong: ({ status }) => `Κάτι πήγε στραβά (${status})`,
+    prompt_out: "Πού να αποθηκευτούν τα τραγούδια;",
+    prompt_folder: "Επιλέξτε τον φάκελο με τα αρχεία βίντεο",
+    prompt_cover: "Επιλέξτε εικόνα εξωφύλλου",
+  },
+};
+
+let lang = "en";
+function t(key, vars = {}) {
+  const value = I18N[lang][key] ?? I18N.en[key] ?? key;
+  return typeof value === "function" ? value(vars) : value;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  $$("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  $$("[data-i18n-html]").forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+  $$("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  $$("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+  $$("[data-i18n-aria]").forEach((el) => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  $$(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  // The parts drawn from data
+  if (lastTools) renderTools(lastTools);
+  renderUpdate(lastUpdate);
+  countLinks("links");
+  countLinks("albums");
+  renderListHeader();
+  renderRows();
+  $("#stop").textContent = t($("#stop").disabled ? "stopping" : "stop");
+  if (lastFinished) renderSummary(lastFinished);
+}
+
+$$(".lang button").forEach((b) => b.addEventListener("click", () => {
+  lang = b.dataset.lang;
+  applyLanguage();
+  api("/api/settings", { lang }).catch(() => {});
+}));
+
+// ---------- state ----------
 
 let mode = "youtube";
 let items = [];          // what the last scan found
 let index = new Map();   // item id -> position in items
 let selected = new Set();
 let results = {};        // item id -> status from the running job
+let problems = [];       // links the last scan couldn't read
 let pollTimer = null;
 let editing = false;     // titles shown as text boxes
 let lastLog = [];
+let lastTools = null, lastUpdate = null, lastFinished = null;
 
 async function api(path, body) {
-  const options = body === undefined ? {} :
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const options = body === undefined ? { headers: { "X-Lang": lang } } :
+    { method: "POST", headers: { "Content-Type": "application/json", "X-Lang": lang }, body: JSON.stringify(body) };
   const res = await fetch(path, options);
   let data = {};
   try { data = await res.json(); } catch {}
-  if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status})`);
+  if (!res.ok) throw new Error(data.error || t("went_wrong", { status: res.status }));
   return data;
 }
 
@@ -303,36 +636,30 @@ function showError(id, message) {
   el.hidden = !message;
 }
 
+const CHECKBOXES = ["date_prefix", "square_cover", "song_tags", "split_chapters", "normalize", "lyrics"];
+const TEXTS = ["url", "links", "albums", "folder", "out", "format", "artist", "album", "cookies", "cover"];
+
 function currentSettings() {
-  return {
-    url: $("#url").value, links: $("#links").value, albums: $("#albums").value,
-    folder: $("#folder").value, out: $("#out").value,
-    format: $("#format").value, artist: $("#artist").value, album: $("#album").value,
-    date_prefix: $("#date_prefix").checked, square_cover: $("#square_cover").checked,
-    song_tags: $("#song_tags").checked, split_chapters: $("#split_chapters").checked,
-    cookies: $("#cookies").value,
-    tabs: $$("input[name=tab]:checked").map((c) => c.value),
-  };
+  const settings = { lang, tabs: $$("input[name=tab]:checked").map((c) => c.value) };
+  for (const key of TEXTS) settings[key] = $("#" + key).value;
+  for (const key of CHECKBOXES) settings[key] = $("#" + key).checked;
+  return settings;
 }
 
 function applySettings(s) {
-  for (const key of ["url", "links", "albums", "folder", "out", "format", "artist", "album", "cookies"]) $("#" + key).value = s[key] ?? "";
-  countLinks("links");
-  countLinks("albums");
-  $("#date_prefix").checked = !!s.date_prefix;
-  $("#square_cover").checked = !!s.square_cover;
-  $("#song_tags").checked = !!s.song_tags;
-  $("#split_chapters").checked = !!s.split_chapters;
+  for (const key of TEXTS) $("#" + key).value = s[key] ?? "";
+  for (const key of CHECKBOXES) $("#" + key).checked = !!s[key];
   $$("input[name=tab]").forEach((c) => { c.checked = (s.tabs || []).includes(c.value); });
 }
 
 // A newer release fixes YouTube downloads that stopped working; show it until closed for that version
 function renderUpdate(update) {
+  lastUpdate = update;
   let hidden = "";
   try { hidden = localStorage.getItem("hide-update") || ""; } catch {}
   if (!update || hidden === update.version) return;
-  $("#update-text").innerHTML = `Version ${esc(update.version)} is available, with the newest fixes for YouTube downloads.
-    <a href="${esc(update.url)}" target="_blank" rel="noopener">Download it</a>`;
+  $("#update-text").innerHTML = `${esc(t("update", { version: update.version }))}
+    <a href="${esc(update.url)}" target="_blank" rel="noopener">${esc(t("update_link"))}</a>`;
   $("#update").hidden = false;
   $("#update-close").onclick = () => {
     $("#update").hidden = true;
@@ -341,10 +668,11 @@ function renderUpdate(update) {
 }
 
 function renderTools(tools) {
+  lastTools = tools;
   const chips = [
     [`v${tools.version}`, ""],
-    tools.ffmpeg ? ["ffmpeg ✓", ""] : ["ffmpeg missing: start the app again to install it", "bad"],
-    tools.js ? [`${tools.js} ✓`, ""] : ["No JavaScript runtime: YouTube downloads may fail", "bad"],
+    tools.ffmpeg ? ["ffmpeg ✓", ""] : [t("no_ffmpeg"), "bad"],
+    tools.js ? [`${tools.js} ✓`, ""] : [t("no_js"), "bad"],
     [`yt-dlp ${tools.ytdlp}`, ""],
   ];
   $("#tools").innerHTML = chips.map(([text, cls]) => `<span class="chip ${cls}">${esc(text)}</span>`).join("");
@@ -375,30 +703,33 @@ const fmtDuration = (s) => {
 };
 const fmtTotal = (s) => {
   const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
-  return h ? `${h} h ${m} min` : `${m} min`;
+  return h ? t("hours", { h, m }) : t("minutes", { m: s > 0 ? Math.max(1, m) : 0 });
 };
 const fmtSize = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.max(1, Math.round(b / 1e6)) + " MB");
 
-function setItems(list, problems = []) {
+function setItems(list, found = []) {
   items = list;
+  problems = found;
   index = new Map(items.map((item, i) => [item.id, i]));
   selected = new Set(items.filter((i) => !i.done).map((i) => i.id));
   results = {};
+  editing = false;
+  lastFinished = null;
   $("#filter").value = "";
   $("#list-card").hidden = $("#action").hidden = items.length === 0;
   $("#summary").hidden = true;
   showError("#start-error", "");
-  $("#problems").hidden = problems.length === 0;
-  $("#problems").innerHTML = problems.length
-    ? "Some links couldn't be read:<br>" + problems.map(esc).join("<br>") : "";
-  editing = false;
-  const noun = { folder: "files", albums: "tracks" }[mode] || "videos";
-  const saved = items.filter((i) => i.done).length;
-  const albumCount = mode === "albums" ? new Set(items.map((i) => i.section)).size : 0;
-  $("#list-title").textContent = `${items.length} ${noun}` +
-    (albumCount ? ` in ${albumCount} ${albumCount === 1 ? "album" : "albums"}` : "") + " found" +
-    (saved ? ` · ${saved} already saved` : "");
+  renderListHeader();
   renderRows();
+}
+
+function renderListHeader() {
+  $("#problems").hidden = problems.length === 0;
+  $("#problems").innerHTML = problems.length ? esc(t("problems")) + "<br>" + problems.map(esc).join("<br>") : "";
+  const kind = { folder: "files", albums: "tracks" }[mode] || "videos";
+  const albums = mode === "albums" ? new Set(items.map((i) => i.section)).size : 0;
+  const saved = items.filter((i) => i.done).length;
+  $("#list-title").textContent = t("found", { n: items.length, kind, albums, saved });
 }
 
 const displayName = (item) => item.name || item.title;
@@ -409,9 +740,9 @@ function renderRows() {
     const tag = sections.size > 1 && item.section ? `<span class="tag">${esc(item.section)}</span>` : "";
     const meta = mode === "folder" ? fmtSize(item.size || 0) : fmtDuration(item.duration);
     const number = item.track ? `<span class="muted">${item.track}.</span> ` : "";
-    const edited = item.name ? `<span class="edited" title="${esc(item.title)}">edited</span>` : "";
+    const edited = item.name ? `<span class="edited" title="${esc(item.title)}">${esc(t("edited"))}</span>` : "";
     const title = editing
-      ? `${number}<input type="text" class="title-edit" value="${esc(displayName(item))}" aria-label="Title">`
+      ? `${number}<input type="text" class="title-edit" value="${esc(displayName(item))}" aria-label="${esc(t("title"))}">`
       : `<label for="r${i}">${number}${esc(displayName(item))}${edited}${tag}</label>`;
     return `<tr data-i="${i}">
       <td class="c"><input type="checkbox" id="r${i}" ${selected.has(item.id) ? "checked" : ""}></td>
@@ -419,7 +750,7 @@ function renderRows() {
       <td class="m">${meta}</td>
       <td class="s">${statusHtml(item)}</td></tr>`;
   }).join("");
-  $("#edit-titles").textContent = editing ? "Done editing" : "Edit titles";
+  $("#edit-titles").textContent = t(editing ? "done_editing" : "edit_titles");
   $("#edit-titles").setAttribute("aria-pressed", String(editing));
   $("#reset-titles").hidden = !items.some((i) => i.name);
   applyFilter();
@@ -428,7 +759,7 @@ function renderRows() {
 
 function statusHtml(item) {
   const status = results[item.id] || (item.done ? "skipped" : "");
-  return status ? `<span class="s-${status}">${STATUS[status]}</span>` : "";
+  return status ? `<span class="s-${status}">${esc(t("status_" + status))}</span>` : "";
 }
 
 function visibleRows() {
@@ -440,13 +771,12 @@ function updateCount() {
   const extra = mode === "folder"
     ? fmtSize(chosen.reduce((sum, i) => sum + (i.size || 0), 0))
     : fmtTotal(chosen.reduce((sum, i) => sum + (i.duration || 0), 0));
-  $("#sel-count").textContent = `${chosen.length} selected · ${extra}`;
+  $("#sel-count").textContent = t("selected", { n: chosen.length, extra });
   const n = chosen.length;
-  $("#start").textContent = mode === "folder" ? `Convert ${n} ${n === 1 ? "file" : "files"}` : `Download ${n} ${n === 1 ? "song" : "songs"}`;
+  $("#start").textContent = t(mode === "folder" ? "convert_n" : "download_n", { n });
   $("#start").disabled = n === 0 || !!pollTimer;
   const resaves = chosen.filter((i) => i.done).length;
-  $("#start-hint").textContent = resaves
-    ? `${resaves} already saved: they're only downloaded again if the file is gone.` : "";
+  $("#start-hint").textContent = resaves ? t("resave_hint", { n: resaves }) : "";
 }
 
 $("#rows").addEventListener("change", (e) => {
@@ -523,9 +853,9 @@ $$("[data-select]").forEach((btn) => btn.addEventListener("click", () => {
 
 // ---------- scan ----------
 
-async function scan(button, errorId, busyText) {
-  const label = button.textContent;
-  button.textContent = busyText;
+async function scan(button, errorId, busyKey) {
+  const key = button.dataset.i18n;
+  button.textContent = t(busyKey);
   button.disabled = true;
   showError(errorId, "");
   try {
@@ -535,19 +865,15 @@ async function scan(button, errorId, busyText) {
   } catch (err) {
     showError(errorId, err.message);
   } finally {
-    button.textContent = label;
+    button.textContent = t(key);
     button.disabled = false;
   }
 }
 
-$("#scan-youtube").addEventListener("click", () =>
-  scan($("#scan-youtube"), "#scan-youtube-error", "Reading your channel… (big channels take a minute)"));
-$("#scan-links").addEventListener("click", () =>
-  scan($("#scan-links"), "#scan-links-error", "Reading the links…"));
-$("#scan-albums").addEventListener("click", () =>
-  scan($("#scan-albums"), "#scan-albums-error", "Reading the albums…"));
-$("#scan-folder").addEventListener("click", () =>
-  scan($("#scan-folder"), "#scan-folder-error", "Looking for files…"));
+$("#scan-youtube").addEventListener("click", () => scan($("#scan-youtube"), "#scan-youtube-error", "busy_channel"));
+$("#scan-links").addEventListener("click", () => scan($("#scan-links"), "#scan-links-error", "busy_links"));
+$("#scan-albums").addEventListener("click", () => scan($("#scan-albums"), "#scan-albums-error", "busy_albums"));
+$("#scan-folder").addEventListener("click", () => scan($("#scan-folder"), "#scan-folder-error", "busy_folder"));
 
 // Same rule as LINK_RE in app.py: YouTube links anywhere in the pasted text
 const LINK_RE = /(?<![\w.-])(?:https?:\/\/)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)\/[^\s<>"'()\[\]{}]+/gi;
@@ -556,20 +882,25 @@ function countLinks(id) {
   const links = new Set(($("#" + id).value.match(LINK_RE) || [])
     .map((l) => l.replace(/[.,;:!?]+$/, ""))
     .map((l) => (/^https?:\/\//i.test(l) ? l : "https://" + l)));
-  $(`#${id}-count`).textContent = links.size ? `${links.size} ${links.size === 1 ? "link" : "links"} found` : "";
+  $(`#${id}-count`).textContent = links.size ? t("links_found", { n: links.size }) : "";
 }
 for (const id of ["links", "albums"]) $("#" + id).addEventListener("input", () => countLinks(id));
 
-// ---------- folders ----------
+// ---------- folders and files ----------
 
 $$("[data-choose]").forEach((btn) => btn.addEventListener("click", async () => {
-  const input = $("#" + btn.dataset.choose);
-  const prompt = btn.dataset.choose === "out" ? "Where should the songs be saved?" : "Choose the folder with your video files";
+  const target = btn.dataset.choose;
+  const input = $("#" + target);
   try {
-    const { path } = await api("/api/choose_folder", { prompt, start: input.value });
+    const { path } = await api("/api/choose_folder", {
+      prompt: t({ out: "prompt_out", folder: "prompt_folder", cover: "prompt_cover" }[target]),
+      start: input.value, kind: target === "cover" ? "image" : "folder",
+    });
     if (path) input.value = path;
   } catch (err) { alert(err.message); }
 }));
+
+$("#cover-clear").addEventListener("click", () => { $("#cover").value = ""; });
 
 $("#open-out").addEventListener("click", async () => {
   try { await api("/api/open_folder", { path: $("#out").value }); } catch (err) { alert(err.message); }
@@ -590,6 +921,7 @@ $("#start").addEventListener("click", async () => {
   try {
     await api("/api/start", { mode, items: chosen, settings: currentSettings() });
     $("#summary").hidden = true;
+    lastFinished = null;
     startPolling();
   } catch (err) {
     showError("#start-error", err.message);
@@ -598,14 +930,14 @@ $("#start").addEventListener("click", async () => {
 
 $("#stop").addEventListener("click", async () => {
   $("#stop").disabled = true;
-  $("#stop").textContent = "Stopping…";
+  $("#stop").textContent = t("stopping");
   await api("/api/cancel", {}).catch(() => {});
 });
 
 function startPolling() {
   setLocked(true);
   $("#stop").disabled = false;
-  $("#stop").textContent = "Stop";
+  $("#stop").textContent = t("stop");
   updateCount();
   let busy = false;
   pollTimer = setInterval(async () => {
@@ -615,7 +947,7 @@ function startPolling() {
       const { job } = await api("/api/state");
       if (job) renderJob(job);
     } catch {
-      $("#p-current").textContent = "Lost contact with the app. Is its window still open?";
+      $("#p-current").textContent = t("lost_contact");
     } finally {
       busy = false;
     }
@@ -631,12 +963,14 @@ function renderJob(job) {
     if (cell) cell.innerHTML = statusHtml(items[i]);
     if (status === "working") cell?.closest("tr").scrollIntoView({ block: "nearest" });
   }
+  const downloading = job.stage === "downloading";
   const finishedCount = job.ok + job.skipped + job.failed.length;
-  const share = job.total ? (finishedCount + (job.stage === "Downloading" ? job.percent / 100 : 0)) / job.total : 0;
+  const share = job.total ? (finishedCount + (downloading ? job.percent / 100 : 0)) / job.total : 0;
   $("#p-bar").style.width = `${Math.min(100, share * 100).toFixed(1)}%`;
-  $("#p-count").textContent = `${Math.min(job.index, job.total)} of ${job.total}`;
-  const pct = job.stage === "Downloading" && job.percent ? ` (${Math.round(job.percent)}%)` : "";
-  $("#p-current").textContent = job.current ? `${job.stage || "Working"}${pct}: ${job.current}` : "";
+  $("#p-count").textContent = t("progress", { i: Math.min(job.index, job.total), n: job.total });
+  const pct = downloading && job.percent ? ` (${Math.round(job.percent)}%)` : "";
+  const stage = t("stage_" + (job.stage || "working"));
+  $("#p-current").textContent = job.current ? `${stage}${pct}: ${job.current}` : "";
   lastLog = job.log;
   if ($("#log-box").open) $("#log").textContent = lastLog.join("\n");
   if (job.finished) finishJob(job);
@@ -656,15 +990,20 @@ function finishJob(job) {
     }
   }
   updateCount();
-  const parts = [`${job.ok} saved`];
-  if (job.skipped) parts.push(`${job.skipped} were already there`);
-  if (job.failed.length) parts.push(`${job.failed.length} failed`);
-  let html = `<strong>${job.cancelled ? "Stopped." : "Finished!"}</strong> ${parts.join(" · ")}.
-    <button type="button" class="link" id="summary-open">Open folder</button>`;
+  renderSummary(job);
+}
+
+function renderSummary(job) {
+  lastFinished = job;
+  const parts = [t("n_saved", { n: job.ok })];
+  if (job.skipped) parts.push(t("n_there", { n: job.skipped }));
+  if (job.failed.length) parts.push(t("n_failed", { n: job.failed.length }));
+  let html = `<strong>${esc(t(job.cancelled ? "stopped" : "finished"))}</strong> ${esc(parts.join(" · "))}.
+    <button type="button" class="link" id="summary-open">${esc(t("open_folder"))}</button>`;
   if (job.message) html += `<div class="notice">${esc(job.message)}</div>`;
   if (job.failed.length) {
     html += `<ul>${job.failed.slice(0, 100).map((f) => `<li>${esc(f.title)}: <span class="muted">${esc(f.reason)}</span></li>`).join("")}</ul>
-      <p class="hint">Failed songs stay ticked. Press Download again to retry them.</p>`;
+      <p class="hint">${esc(t("retry_hint"))}</p>`;
   }
   $("#summary").innerHTML = html;
   $("#summary").hidden = false;
@@ -672,7 +1011,7 @@ function finishJob(job) {
 }
 
 $("#log-box").addEventListener("toggle", () => {
-  if ($("#log-box").open) $("#log").textContent = lastLog.join("\n") || "(nothing yet)";
+  if ($("#log-box").open) $("#log").textContent = lastLog.join("\n") || t("nothing_yet");
 });
 
 // ---------- start-up ----------
@@ -680,10 +1019,14 @@ $("#log-box").addEventListener("toggle", () => {
 $$(".tabs button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
 (async function init() {
+  setMode("youtube");
   try {
     const state = await api("/api/state?items=1");
+    const saved = state.settings.lang;
+    lang = saved === "el" || saved === "en" ? saved : (navigator.language || "").toLowerCase().startsWith("el") ? "el" : "en";
     applySettings(state.settings);
-    renderTools(state.tools);
+    lastTools = state.tools;
+    applyLanguage();
     renderUpdate(state.update);
     setTimeout(async () => {  // the app asks GitHub in the background right after it starts
       try { renderUpdate((await api("/api/state")).update); } catch {}
@@ -695,7 +1038,8 @@ $$(".tabs button").forEach((b) => b.addEventListener("click", () => setMode(b.da
       startPolling();
     }
   } catch (err) {
-    showError("#scan-youtube-error", "Can't reach the app. Start it again.");
+    applyLanguage();
+    showError("#scan-youtube-error", t("cant_reach"));
   }
 })();
 </script>
