@@ -3,6 +3,22 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.2 — 2026-10-10
+
+### Added
+
+- **Album links** tab: paste YouTube Music album links (`music.youtube.com/playlist?list=OLAK5uy_…`
+  or `music.youtube.com/browse/MPREb_…`), one per line. Every album is listed with its tracks
+  in order.
+- Each album is saved in its own folder, `Artist - Album/01 - Track.mp3`, with album title,
+  album artist, track number (e.g. 3/12), the release date and the album cover.
+- Other YouTube playlists work as albums too.
+
+### Changed
+
+- In the Album links tab, artist, album and year come from each album, so those settings are
+  hidden there.
+
 ## v0.1 — 2026-10-10
 
 ### Added

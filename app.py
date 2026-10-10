@@ -34,9 +34,9 @@ from pathlib import Path
 
 import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
-from yt_dlp.utils import DownloadCancelled, DownloadError
+from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.1"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.2"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -57,12 +57,14 @@ BLOCKED_SIGNS = ("not a bot", "HTTP Error 429", "rate-limit", "rate limit")
 # A YouTube link anywhere in pasted text: videos, youtu.be, Shorts, live, playlists, channels, YouTube Music
 LINK_RE = re.compile(r"(?<![\w.-])(?:https?://)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)/[^\s<>\"'()\[\]{}]+", re.I)
 SCAN_WORKERS = 4  # reading one video link takes a second or two, so read a few at once
+ALBUM_PREFIX_RE = re.compile(r"^(?:Album|EP|Single) - ", re.I)  # YouTube Music album titles start like this
 CHANNEL_RE = re.compile(
     r"(?:https?://)?(?:www\.|m\.)?youtube\.com/(@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+)/?", re.I)
 
 DEFAULT_SETTINGS = {
     "url": "",
     "links": "",
+    "albums": "",
     "tabs": ["videos", "streams"],
     "folder": "",
     "out": str(Path.home() / "Music" / "YouTube MP3"),
@@ -242,19 +244,33 @@ class JobLogger:
 # ---------- YouTube ----------
 
 class SetTags(PostProcessor):
-    """Sets artist/album/date tags. FFmpegMetadata gives meta_* fields priority."""
+    """Sets the tags of the video being downloaded; the job updates the fields per video.
+    FFmpegMetadata gives meta_* fields priority over what yt-dlp found."""
 
-    def __init__(self, artist, album):
+    def __init__(self, artist="", album=""):
         super().__init__()
         self.artist, self.album = artist, album
+        self.album_artist = ""  # album mode: the album's artist
+        self.track = ""         # album mode: "3/12"
 
     def run(self, info):
         if self.artist:
             info["meta_artist"] = info["meta_album_artist"] = self.artist
+        if self.album_artist:
+            info["meta_album_artist"] = self.album_artist
+            if not (info.get("artist") or info.get("artists")):  # otherwise keep the track's own artist
+                info["meta_artist"] = self.album_artist
         if self.album:
             info["meta_album"] = self.album
-        if (d := info.get("upload_date")) and len(d) == 8:
-            info["meta_date"] = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+        if self.track:
+            info["meta_track"] = self.track
+        # Albums are dated by their release; videos by their upload
+        date = (self.track and (info.get("release_date") or info.get("release_year"))) or info.get("upload_date")
+        date = str(date or "")
+        if len(date) == 8:
+            info["meta_date"] = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+        elif date:
+            info["meta_date"] = date
         return [], info
 
 
@@ -393,6 +409,60 @@ def scan_youtube(body):
     return scan_sources(sources, settings)
 
 
+def folder_name(text):
+    """A folder name that works on Windows, macOS and Linux."""
+    return sanitize_filename(text).strip().rstrip(". ")[:120] or "Album"
+
+
+def scan_albums(body):
+    """Lists the tracks of YouTube Music albums (any YouTube playlist link works too)."""
+    settings = save_settings(body)
+    links = find_links(settings["albums"])
+    if not links:
+        raise UserError("No album links found. Paste YouTube Music album links like "
+                        "https://music.youtube.com/playlist?list=OLAK5uy_… one per line.")
+    archive = read_archive(out_dir(settings))
+    with ThreadPoolExecutor(max_workers=SCAN_WORKERS) as pool:
+        results = list(pool.map(lambda url: read_source((url, "Album"), settings), links))
+    items, seen, albums, problems = [], set(), set(), []
+    for url, _, info, err in results:
+        if err:
+            problems.append(f"{url}: {clean_error(err)}")
+            continue
+        if not info or info.get("id") in albums:
+            continue
+        if info.get("_type") != "playlist":
+            problems.append(f"{url}: this is a single video, not an album. Use Paste links for it.")
+            continue
+        albums.add(info["id"])
+        tracks = list(video_entries(info))
+        album = ALBUM_PREFIX_RE.sub("", info.get("title") or "").strip() or "Unknown album"
+        # The album page names no artist; its tracks do (an auto-made "… - Topic" channel counts too)
+        owners = Counter(e.get("channel") or e.get("uploader") for e in tracks)
+        owners.pop(None, None)
+        artist = info.get("channel") or info.get("uploader") or (owners.most_common(1)[0][0] if owners else "")
+        artist = re.sub(r" - Topic$", "", artist)
+        for number, entry in enumerate(tracks, 1):
+            if entry["id"] in seen:
+                continue
+            seen.add(entry["id"])
+            items.append({
+                "id": entry["id"],
+                "title": entry.get("title") or entry["id"],
+                "url": entry.get("url") or f"https://www.youtube.com/watch?v={entry['id']}",
+                "duration": entry.get("duration"),
+                "section": f"{artist} – {album}" if artist else album,
+                "done": entry["id"] in archive,
+                "album": album,
+                "album_artist": artist,
+                "track": number,
+                "tracks": len(tracks),
+            })
+    if not items and problems:
+        raise UserError(f"Couldn't read {'that link' if len(problems) == 1 else 'those links'}. {problems[0]}")
+    return {"channel": "", "items": items, "problems": problems}
+
+
 def scan_links(body):
     settings = save_settings(body)
     links = find_links(settings["links"])
@@ -438,12 +508,15 @@ def run_youtube_job(job, settings):
     opts = yt_dlp.parse_options(args).ydl_opts
     # ignoreerrors=False so a failed video raises and is reported, instead of silently counting as saved
     opts.update(logger=JobLogger(job), noprogress=True, progress_hooks=[progress], ignoreerrors=False)
+    albums = job.mode == "albums"
     name = "%(title)s"
     if settings["date_prefix"]:
         name = "%(upload_date>%Y-%m-%d)s - " + name
+    # Albums take artist and album from each album; the other tabs from the settings
+    tags = SetTags() if albums else SetTags(settings["artist"].strip(), settings["album"].strip())
 
     with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.add_post_processor(SetTags(settings["artist"].strip(), settings["album"].strip()), when="pre_process")
+        ydl.add_post_processor(tags, when="pre_process")
         if settings["square_cover"] and FFMPEG:
             ydl.add_post_processor(SquareCover(), when="before_dl")  # runs after the jpg conversion
         downloaded_any = False
@@ -460,7 +533,15 @@ def run_youtube_job(job, settings):
                 if job.cancel:
                     break
             job.set_result(item, "working")
-            ydl.params["outtmpl"]["default"] = name + (" [%(id)s]" if item.get("dup") else "") + ".%(ext)s"
+            if albums:  # "Artist - Album/03 - Track.mp3"
+                tags.album, tags.album_artist = item.get("album", ""), item.get("album_artist", "")
+                tags.track = f"{item['track']}/{item['tracks']}"
+                folder = folder_name(" - ".join(filter(None, (tags.album_artist, tags.album))))
+                number = str(item["track"]).zfill(max(2, len(str(item["tracks"]))))
+                template = f"{folder.replace('%', '%%')}/{number} - %(track,title)s.%(ext)s"
+            else:
+                template = name + (" [%(id)s]" if item.get("dup") else "") + ".%(ext)s"
+            ydl.params["outtmpl"]["default"] = template
             try:
                 ydl.download([item["url"]])
                 job.set_result(item, "ok")
@@ -585,7 +666,7 @@ def start_job(body):
         raise UserError("ffmpeg is missing. Start the app again with Start.command, Start.bat or start.sh to install it.")
     mode = body.get("mode")
     items = [i for i in body.get("items") or [] if isinstance(i, dict) and i.get("id")]
-    if mode not in ("youtube", "links", "folder") or not items:
+    if mode not in ("youtube", "links", "albums", "folder") or not items:
         raise UserError("Select at least one item.")
     settings = save_settings(body.get("settings") or {})
     if settings["format"] not in ("mp3_320", "mp3_192", "original"):
@@ -680,6 +761,7 @@ def get_state(with_items):
 ROUTES = {
     "/api/scan_youtube": scan_youtube,
     "/api/scan_links": scan_links,
+    "/api/scan_albums": scan_albums,
     "/api/scan_folder": scan_folder,
     "/api/start": start_job,
     "/api/cancel": cancel_job,

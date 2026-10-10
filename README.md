@@ -26,6 +26,8 @@ A small window stays open while the app works (close it to quit) and the app ope
 1. Paste your channel link, e.g. `https://www.youtube.com/@yourname`, and press **Find videos**.
    Or open **Paste links** and paste the links of the videos or playlists you want, one per line
    (a whole message works too). Unlisted videos work there, as long as you have their link.
+   For whole albums, open **Album links** and paste YouTube Music album links: each album gets
+   its own folder (`Artist - Album/01 - Track.mp3`) with track numbers, album tags and cover.
 2. Check **Artist**, **Album** and **Save to** in Settings.
 3. Press **Download**. A big channel takes hours. You can press **Stop** (or close the app) and
    continue another day: songs that are already saved are skipped.
