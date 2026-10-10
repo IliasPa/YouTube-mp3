@@ -194,6 +194,9 @@
         </label>
         <p class="hint albums-only" style="margin:0 0 12px">Artist, album, track numbers and year come from each album.</p>
       </div>
+      <label class="check yt-only not-albums"><input type="checkbox" id="song_tags"> Use the song's own details when
+        YouTube Music knows the song <span class="muted">(title, artist, album, release date; other videos keep
+        their title and the Artist and Album above)</span></label>
       <label class="check yt-only not-albums"><input type="checkbox" id="date_prefix"> Start file names with the upload date
         <span class="muted">(2021-03-14 - Song title.mp3)</span></label>
       <label class="check yt-only"><input type="checkbox" id="square_cover"> Square cover art
@@ -289,6 +292,7 @@ function currentSettings() {
     folder: $("#folder").value, out: $("#out").value,
     format: $("#format").value, artist: $("#artist").value, album: $("#album").value,
     date_prefix: $("#date_prefix").checked, square_cover: $("#square_cover").checked,
+    song_tags: $("#song_tags").checked,
     cookies: $("#cookies").value,
     tabs: $$("input[name=tab]:checked").map((c) => c.value),
   };
@@ -300,6 +304,7 @@ function applySettings(s) {
   countLinks("albums");
   $("#date_prefix").checked = !!s.date_prefix;
   $("#square_cover").checked = !!s.square_cover;
+  $("#song_tags").checked = !!s.song_tags;
   $$("input[name=tab]").forEach((c) => { c.checked = (s.tabs || []).includes(c.value); });
 }
 

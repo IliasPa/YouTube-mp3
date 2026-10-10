@@ -36,7 +36,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.2"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.3"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -73,6 +73,7 @@ DEFAULT_SETTINGS = {
     "album": "YouTube Archive",
     "date_prefix": True,
     "square_cover": True,
+    "song_tags": False,  # off: covers can be linked to the original song and get its artist
     "cookies": "",
 }
 
@@ -247,25 +248,36 @@ class SetTags(PostProcessor):
     """Sets the tags of the video being downloaded; the job updates the fields per video.
     FFmpegMetadata gives meta_* fields priority over what yt-dlp found."""
 
-    def __init__(self, artist="", album=""):
+    def __init__(self, artist="", album="", song_tags=False):
         super().__init__()
-        self.artist, self.album = artist, album
+        self.artist, self.album, self.song_tags = artist, album, song_tags
         self.album_artist = ""  # album mode: the album's artist
         self.track = ""         # album mode: "3/12"
 
     def run(self, info):
-        if self.artist:
-            info["meta_artist"] = info["meta_album_artist"] = self.artist
-        if self.album_artist:
-            info["meta_album_artist"] = self.album_artist
-            if not (info.get("artist") or info.get("artists")):  # otherwise keep the track's own artist
-                info["meta_artist"] = self.album_artist
-        if self.album:
-            info["meta_album"] = self.album
-        if self.track:
+        artists = info.get("artists") or ([info["artist"]] if info.get("artist") else [])
+        # A song YouTube Music knows comes with its own title, artist, album and release date
+        use_song = bool(self.track) or (self.song_tags and bool(info.get("track") and artists))
+        if self.track:  # album mode: the album's title and artist; each track keeps its own artist
             info["meta_track"] = self.track
-        # Albums are dated by their release; videos by their upload
-        date = (self.track and (info.get("release_date") or info.get("release_year"))) or info.get("upload_date")
+            if self.album:
+                info["meta_album"] = self.album
+            if self.album_artist:
+                info["meta_album_artist"] = self.album_artist
+                if not artists:
+                    info["meta_artist"] = self.album_artist
+        elif use_song:  # the song's own details; the Album setting only fills a missing album
+            info["meta_album_artist"] = info.get("album_artist") or artists[0]
+            if not info.get("album") and self.album:
+                info["meta_album"] = self.album
+        else:  # the video's own title, with artist and album from the settings
+            info["meta_title"] = info.get("title")
+            if self.artist:
+                info["meta_artist"] = info["meta_album_artist"] = self.artist
+            if self.album:
+                info["meta_album"] = self.album
+        # Songs are dated by their release, videos by their upload
+        date = (use_song and (info.get("release_date") or info.get("release_year"))) or info.get("upload_date")
         date = str(date or "")
         if len(date) == 8:
             info["meta_date"] = f"{date[:4]}-{date[4:6]}-{date[6:]}"
@@ -513,7 +525,7 @@ def run_youtube_job(job, settings):
     if settings["date_prefix"]:
         name = "%(upload_date>%Y-%m-%d)s - " + name
     # Albums take artist and album from each album; the other tabs from the settings
-    tags = SetTags() if albums else SetTags(settings["artist"].strip(), settings["album"].strip())
+    tags = SetTags() if albums else SetTags(settings["artist"].strip(), settings["album"].strip(), settings["song_tags"])
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.add_post_processor(tags, when="pre_process")

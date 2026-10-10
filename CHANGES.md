@@ -3,6 +3,21 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.3 — 2026-10-10
+
+### Added
+
+- Setting **Use the song's own details when YouTube Music knows the song**: such songs are
+  tagged with their own title, artist, album, album artist and release date instead of the
+  video's title, your Artist and Album settings and the upload date. Other videos keep the
+  video's details. It's off by default, because YouTube can link a cover version to the
+  original song and its artist.
+
+### Changed
+
+- With that setting off, the title tag is always the video's title. Before, it silently became
+  the song title when YouTube knew the song.
+
 ## v0.2 — 2026-10-10
 
 ### Added
