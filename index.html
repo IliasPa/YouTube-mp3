@@ -101,13 +101,14 @@
 
   <div class="tabs" role="tablist">
     <button role="tab" data-mode="youtube" aria-selected="true">From my YouTube channel</button>
+    <button role="tab" data-mode="links" aria-selected="false">Paste links</button>
     <button role="tab" data-mode="folder" aria-selected="false">From video files on this computer</button>
   </div>
 
   <section class="card" id="src-youtube">
     <fieldset class="lockable">
-      <label class="field">Your channel link (or playlist / video links, one per line)
-        <textarea id="url" rows="2" placeholder="https://www.youtube.com/@yourchannel"></textarea>
+      <label class="field">Your channel link
+        <input id="url" type="text" placeholder="https://www.youtube.com/@yourchannel">
       </label>
       <div class="row">
         <span class="muted">Include:</span>
@@ -117,10 +118,26 @@
         <span class="spacer"></span>
         <button id="scan-youtube" class="primary">Find videos</button>
       </div>
-      <p class="hint">Only <strong>public</strong> videos are listed. For private or unlisted ones, export your
-        channel with <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a>
-        and use the second tab.</p>
+      <p class="hint">Only <strong>public</strong> videos are listed. For unlisted ones, paste their links in
+        <strong>Paste links</strong>. For private ones, export your channel with
+        <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> and use the last tab.</p>
       <p class="error" id="scan-youtube-error" hidden></p>
+    </fieldset>
+  </section>
+
+  <section class="card" id="src-links" hidden>
+    <fieldset class="lockable">
+      <label class="field">YouTube links: videos, Shorts or playlists, one per line
+        <textarea id="links" rows="7" placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…&#10;https://www.youtube.com/playlist?list=…"></textarea>
+      </label>
+      <div class="row">
+        <span class="muted" id="links-count"></span>
+        <span class="spacer"></span>
+        <button id="scan-links" class="primary">Find videos</button>
+      </div>
+      <p class="hint">You can paste a whole message or list: the links are picked out of the text. Unlisted
+        videos work too, as long as you have their link.</p>
+      <p class="error" id="scan-links-error" hidden></p>
     </fieldset>
   </section>
 
@@ -249,7 +266,7 @@ function showError(id, message) {
 
 function currentSettings() {
   return {
-    url: $("#url").value, folder: $("#folder").value, out: $("#out").value,
+    url: $("#url").value, links: $("#links").value, folder: $("#folder").value, out: $("#out").value,
     format: $("#format").value, artist: $("#artist").value, album: $("#album").value,
     date_prefix: $("#date_prefix").checked, square_cover: $("#square_cover").checked,
     cookies: $("#cookies").value,
@@ -258,7 +275,8 @@ function currentSettings() {
 }
 
 function applySettings(s) {
-  for (const key of ["url", "folder", "out", "format", "artist", "album", "cookies"]) $("#" + key).value = s[key] ?? "";
+  for (const key of ["url", "links", "folder", "out", "format", "artist", "album", "cookies"]) $("#" + key).value = s[key] ?? "";
+  countLinks();
   $("#date_prefix").checked = !!s.date_prefix;
   $("#square_cover").checked = !!s.square_cover;
   $$("input[name=tab]").forEach((c) => { c.checked = (s.tabs || []).includes(c.value); });
@@ -278,8 +296,9 @@ function setMode(next) {
   mode = next;
   $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
   $("#src-youtube").hidden = mode !== "youtube";
+  $("#src-links").hidden = mode !== "links";
   $("#src-folder").hidden = mode !== "folder";
-  $$(".yt-only").forEach((el) => { el.hidden = mode !== "youtube"; });
+  $$(".yt-only").forEach((el) => { el.hidden = mode === "folder"; });
   setItems([]);
 }
 
@@ -310,12 +329,12 @@ function setItems(list, problems = []) {
   $("#problems").innerHTML = problems.length
     ? "Some links couldn't be read:<br>" + problems.map(esc).join("<br>") : "";
   const sections = new Set(items.map((i) => i.section).filter(Boolean));
-  const noun = mode === "youtube" ? "videos" : "files";
+  const noun = mode === "folder" ? "files" : "videos";
   const saved = items.filter((i) => i.done).length;
   $("#list-title").textContent = `${items.length} ${noun} found` + (saved ? ` · ${saved} already saved` : "");
   $("#rows").innerHTML = items.length ? items.map((item, i) => {
     const tag = sections.size > 1 && item.section ? `<span class="tag">${esc(item.section)}</span>` : "";
-    const meta = mode === "youtube" ? fmtDuration(item.duration) : fmtSize(item.size || 0);
+    const meta = mode === "folder" ? fmtSize(item.size || 0) : fmtDuration(item.duration);
     return `<tr data-i="${i}">
       <td class="c"><input type="checkbox" id="r${i}" ${selected.has(item.id) ? "checked" : ""}></td>
       <td class="t"><label for="r${i}">${esc(item.title)}${tag}</label></td>
@@ -336,12 +355,12 @@ function visibleRows() {
 
 function updateCount() {
   const chosen = items.filter((i) => selected.has(i.id));
-  const extra = mode === "youtube"
-    ? fmtTotal(chosen.reduce((sum, i) => sum + (i.duration || 0), 0))
-    : fmtSize(chosen.reduce((sum, i) => sum + (i.size || 0), 0));
+  const extra = mode === "folder"
+    ? fmtSize(chosen.reduce((sum, i) => sum + (i.size || 0), 0))
+    : fmtTotal(chosen.reduce((sum, i) => sum + (i.duration || 0), 0));
   $("#sel-count").textContent = `${chosen.length} selected · ${extra}`;
   const n = chosen.length;
-  $("#start").textContent = mode === "youtube" ? `Download ${n} ${n === 1 ? "song" : "songs"}` : `Convert ${n} ${n === 1 ? "file" : "files"}`;
+  $("#start").textContent = mode === "folder" ? `Convert ${n} ${n === 1 ? "file" : "files"}` : `Download ${n} ${n === 1 ? "song" : "songs"}`;
   $("#start").disabled = n === 0 || !!pollTimer;
   const resaves = chosen.filter((i) => i.done).length;
   $("#start-hint").textContent = resaves
@@ -391,8 +410,21 @@ async function scan(button, errorId, busyText) {
 
 $("#scan-youtube").addEventListener("click", () =>
   scan($("#scan-youtube"), "#scan-youtube-error", "Reading your channel… (big channels take a minute)"));
+$("#scan-links").addEventListener("click", () =>
+  scan($("#scan-links"), "#scan-links-error", "Reading the links…"));
 $("#scan-folder").addEventListener("click", () =>
   scan($("#scan-folder"), "#scan-folder-error", "Looking for files…"));
+
+// Same rule as LINK_RE in app.py: YouTube links anywhere in the pasted text
+const LINK_RE = /(?<![\w.-])(?:https?:\/\/)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)\/[^\s<>"'()\[\]{}]+/gi;
+
+function countLinks() {
+  const links = new Set(($("#links").value.match(LINK_RE) || [])
+    .map((l) => l.replace(/[.,;:!?]+$/, ""))
+    .map((l) => (/^https?:\/\//i.test(l) ? l : "https://" + l)));
+  $("#links-count").textContent = links.size ? `${links.size} ${links.size === 1 ? "link" : "links"} found` : "";
+}
+$("#links").addEventListener("input", countLinks);
 
 // ---------- folders ----------
 

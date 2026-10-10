@@ -3,6 +3,22 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.1 — 2026-10-10
+
+### Added
+
+- **Paste links** tab: paste YouTube links (videos, Shorts, playlists, YouTube Music) one per
+  line, or a whole message or list; the links are picked out of the text and counted as you
+  paste. Repeats are removed, and a video link that also names a playlist means just that video.
+- Unlisted videos can be downloaded from the Paste links tab, as long as you have their link.
+- Videos from a pasted playlist are marked with the playlist's name in the list.
+
+### Changed
+
+- The channel tab now takes just your channel link; lists of links go in the new tab.
+- Links are read four at a time, so long lists are found faster.
+- The artist name is only filled in for you when all videos come from the same channel.
+
 ## v0.0 — 2026-10-10
 
 First release.

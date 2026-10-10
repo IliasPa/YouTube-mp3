@@ -28,6 +28,7 @@ import time
 import traceback
 import webbrowser
 from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -35,7 +36,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError
 
-APP_VERSION = "0.0"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.1"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -53,11 +54,15 @@ AUDIO_EXTS = (".mp3", ".m4a", ".opus", ".ogg", ".flac", ".wav")
 # Audio codec -> file extension when keeping the original audio without re-encoding
 COPY_EXT = {"aac": "m4a", "alac": "m4a", "mp3": "mp3", "opus": "opus", "vorbis": "ogg", "flac": "flac"}
 BLOCKED_SIGNS = ("not a bot", "HTTP Error 429", "rate-limit", "rate limit")
+# A YouTube link anywhere in pasted text: videos, youtu.be, Shorts, live, playlists, channels, YouTube Music
+LINK_RE = re.compile(r"(?<![\w.-])(?:https?://)?(?:[\w-]+\.)?(?:youtube\.com|youtu\.be)/[^\s<>\"'()\[\]{}]+", re.I)
+SCAN_WORKERS = 4  # reading one video link takes a second or two, so read a few at once
 CHANNEL_RE = re.compile(
     r"(?:https?://)?(?:www\.|m\.)?youtube\.com/(@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+)/?", re.I)
 
 DEFAULT_SETTINGS = {
     "url": "",
+    "links": "",
     "tabs": ["videos", "streams"],
     "folder": "",
     "out": str(Path.home() / "Music" / "YouTube MP3"),
@@ -302,6 +307,18 @@ def expand_sources(text, tabs):
     return sources
 
 
+def find_links(text):
+    """Picks the YouTube links out of pasted text: one per line, or mixed into a longer message."""
+    links = []
+    for match in LINK_RE.finditer(text):
+        url = match.group(0).rstrip(".,;:!?")
+        if not re.match(r"https?://", url, re.I):
+            url = "https://" + url
+        if url not in links:
+            links.append(url)
+    return links
+
+
 def video_entries(info):
     if info.get("_type") in ("playlist", "multi_video"):
         for entry in info.get("entries") or []:
@@ -309,6 +326,60 @@ def video_entries(info):
                 yield from video_entries(entry)
     elif info.get("ie_key") in (None, "Youtube") and info.get("id"):
         yield info
+
+
+def read_source(source, settings):
+    """Lists what one link points to (a video, a playlist or a channel tab) without downloading."""
+    url, label = source
+    opts = yt_dlp.parse_options(base_args(settings)).ydl_opts
+    # ignoreerrors=False: the CLI default would return None for a failed link instead of raising.
+    # noplaylist: a video link that also names a playlist (watch?v=…&list=…) means just that video.
+    opts.update(extract_flat="in_playlist", skip_download=True, quiet=True, no_warnings=True,
+                ignoreerrors=False, noplaylist=True)
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            return url, label, ydl.extract_info(url, download=False), None
+    except DownloadError as err:
+        return url, label, None, err
+
+
+def scan_sources(sources, settings):
+    archive = read_archive(out_dir(settings))
+    with ThreadPoolExecutor(max_workers=SCAN_WORKERS) as pool:  # keeps the links' order
+        results = list(pool.map(lambda source: read_source(source, settings), sources))
+    items, seen, channels, problems = [], set(), [], []
+    for url, label, info, err in results:
+        if err:
+            if "does not have a" not in str(err):  # a channel without Shorts or Live isn't a problem
+                problems.append(f"{url}: {clean_error(err)}")
+            continue
+        if not info:
+            continue
+        if owner := info.get("channel") or info.get("uploader"):
+            channels.append(owner)
+        if label == "Link" and info.get("_type") == "playlist":
+            label = info.get("title") or "Playlist"
+        for entry in video_entries(info):
+            if entry["id"] in seen:
+                continue
+            seen.add(entry["id"])
+            items.append({
+                "id": entry["id"],
+                "title": entry.get("title") or entry["id"],
+                "url": entry.get("webpage_url") or entry.get("url") or f"https://www.youtube.com/watch?v={entry['id']}",
+                "duration": entry.get("duration"),
+                "section": label,
+                "done": entry["id"] in archive,
+            })
+    if not items and problems:
+        raise UserError(f"Couldn't read {'that link' if len(problems) == 1 else 'those links'}. {problems[0]}")
+    # Same title twice (e.g. two takes of one song): add the video id so neither file overwrites the other
+    counts = Counter(i["title"].casefold() for i in items)
+    for item in items:
+        item["dup"] = counts[item["title"].casefold()] > 1
+    # Suggest an artist name only when everything comes from one channel
+    channel = channels[0] if len(set(channels)) == 1 else ""
+    return {"channel": channel, "items": items, "problems": problems}
 
 
 def scan_youtube(body):
@@ -319,43 +390,17 @@ def scan_youtube(body):
         if settings["url"].strip():  # only a channel link, with no tab ticked
             raise UserError("Tick at least one of Videos, Live streams or Shorts.")
         raise UserError("Paste your channel link first, e.g. https://www.youtube.com/@yourname")
+    return scan_sources(sources, settings)
 
-    opts = yt_dlp.parse_options(base_args(settings)).ydl_opts
-    # ignoreerrors=False: the CLI default would return None for a failed link instead of raising
-    opts.update(extract_flat="in_playlist", skip_download=True, quiet=True, no_warnings=True, ignoreerrors=False)
-    archive = read_archive(out_dir(settings))
-    items, seen, channel, problems = [], set(), "", []
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        for url, label in sources:
-            try:
-                info = ydl.extract_info(url, download=False)
-            except DownloadError as err:
-                if "does not have a" in str(err):  # e.g. the channel has no Shorts
-                    continue
-                problems.append(f"{url}: {clean_error(err)}")
-                continue
-            if not info:
-                continue
-            channel = channel or info.get("channel") or info.get("uploader") or ""
-            for entry in video_entries(info):
-                if entry["id"] in seen:
-                    continue
-                seen.add(entry["id"])
-                items.append({
-                    "id": entry["id"],
-                    "title": entry.get("title") or entry["id"],
-                    "url": entry.get("webpage_url") or entry.get("url") or f"https://www.youtube.com/watch?v={entry['id']}",
-                    "duration": entry.get("duration"),
-                    "section": label,
-                    "done": entry["id"] in archive,
-                })
-    if not items and problems:
-        raise UserError("Couldn't read that link. " + problems[0])
-    # Same title twice (e.g. two takes of one song): add the video id so neither file overwrites the other
-    counts = Counter(i["title"].casefold() for i in items)
-    for item in items:
-        item["dup"] = counts[item["title"].casefold()] > 1
-    return {"channel": channel, "items": items, "problems": problems}
+
+def scan_links(body):
+    settings = save_settings(body)
+    links = find_links(settings["links"])
+    if not links:
+        raise UserError("No YouTube links found. Paste links like https://www.youtube.com/watch?v=… "
+                        "or https://youtu.be/…, one per line.")
+    # A channel link pasted here brings all of its videos, live streams and Shorts
+    return scan_sources(expand_sources("\n".join(links), list(CHANNEL_TABS)), settings)
 
 
 def run_youtube_job(job, settings):
@@ -540,7 +585,7 @@ def start_job(body):
         raise UserError("ffmpeg is missing. Start the app again with Start.command, Start.bat or start.sh to install it.")
     mode = body.get("mode")
     items = [i for i in body.get("items") or [] if isinstance(i, dict) and i.get("id")]
-    if mode not in ("youtube", "folder") or not items:
+    if mode not in ("youtube", "links", "folder") or not items:
         raise UserError("Select at least one item.")
     settings = save_settings(body.get("settings") or {})
     if settings["format"] not in ("mp3_320", "mp3_192", "original"):
@@ -548,7 +593,7 @@ def start_job(body):
     out_dir(settings)
     job = Job(mode, items)
     JOB["current"] = job
-    runner = run_youtube_job if mode == "youtube" else run_folder_job
+    runner = run_folder_job if mode == "folder" else run_youtube_job
 
     def work():
         try:
@@ -634,6 +679,7 @@ def get_state(with_items):
 
 ROUTES = {
     "/api/scan_youtube": scan_youtube,
+    "/api/scan_links": scan_links,
     "/api/scan_folder": scan_folder,
     "/api/start": start_job,
     "/api/cancel": cancel_job,
