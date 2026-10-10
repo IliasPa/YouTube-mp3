@@ -3,6 +3,23 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.4 — 2026-10-10
+
+### Added
+
+- **Update notice:** the app checks GitHub when it starts and shows "Version … is available"
+  when there is a newer release. YouTube changes often, and a downloaded app keeps working only
+  with a recent yt-dlp. The notice can be closed until the next version.
+- **Automatic yt-dlp updates for the apps:** every week GitHub checks for a new yt-dlp and, if
+  there is one, publishes a patch version (e.g. v0.4.1) built with it.
+- **Split videos with chapters into songs** (setting): a live stream or concert with chapters
+  becomes numbered tracks in a folder named after the video, each titled by its chapter, with
+  the video's title as the album.
+- **Tidy titles** in the list: removes extras like "(Official Video)", "[4K]", "| Live at …",
+  hashtags and your artist name in front. **Edit titles** lets you rename any song before
+  downloading; **Undo title changes** brings the originals back. The file name and title tag
+  follow your titles.
+
 ## v0.3 — 2026-10-10
 
 ### Added

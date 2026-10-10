@@ -79,6 +79,8 @@
   td.m { color: var(--muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   td.s { width: 120px; white-space: nowrap; font-size: 13px; color: var(--muted); }
   .s-ok { color: var(--ok); } .s-failed { color: var(--bad); } .s-working { color: var(--accent); font-weight: 600; }
+  input.title-edit { padding: 4px 8px; }
+  .edited { font-size: 11px; color: var(--accent); margin-left: 6px; cursor: help; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--soft); color: var(--muted); margin-left: 6px; }
   .empty { padding: 18px; text-align: center; color: var(--muted); }
 
@@ -97,6 +99,11 @@
     <h1>YouTube → MP3</h1>
     <p class="sub">Save the audio of your uploads as music files, with title, date, artist and cover art.</p>
     <div id="tools" class="chips"></div>
+    <div class="notice row" id="update" hidden>
+      <span id="update-text"></span>
+      <span class="spacer"></span>
+      <button type="button" class="link" id="update-close" aria-label="Hide this notice">✕</button>
+    </div>
   </header>
 
   <div class="tabs" role="tablist">
@@ -197,6 +204,9 @@
       <label class="check yt-only not-albums"><input type="checkbox" id="song_tags"> Use the song's own details when
         YouTube Music knows the song <span class="muted">(title, artist, album, release date; other videos keep
         their title and the Artist and Album above)</span></label>
+      <label class="check yt-only not-albums"><input type="checkbox" id="split_chapters"> Split videos with chapters
+        into separate songs <span class="muted">(e.g. a live stream or concert: numbered tracks in a folder named
+        after the video)</span></label>
       <label class="check yt-only not-albums"><input type="checkbox" id="date_prefix"> Start file names with the upload date
         <span class="muted">(2021-03-14 - Song title.mp3)</span></label>
       <label class="check yt-only"><input type="checkbox" id="square_cover"> Square cover art
@@ -234,6 +244,12 @@
         <span class="spacer"></span>
         <span id="sel-count" class="muted"></span>
       </div>
+      <div class="row" style="margin-top:4px">
+        <span class="muted">Titles:</span>
+        <button type="button" class="link" id="tidy-titles" title="Removes extras like (Official Video), [4K], | Live at…, #hashtags and your artist name">Tidy titles</button>
+        <button type="button" class="link" id="edit-titles" aria-pressed="false">Edit titles</button>
+        <button type="button" class="link" id="reset-titles" hidden>Undo title changes</button>
+      </div>
       <div class="notice" id="problems" hidden></div>
       <div class="table-wrap"><table><tbody id="rows"></tbody></table></div>
     </fieldset>
@@ -268,6 +284,7 @@ let index = new Map();   // item id -> position in items
 let selected = new Set();
 let results = {};        // item id -> status from the running job
 let pollTimer = null;
+let editing = false;     // titles shown as text boxes
 let lastLog = [];
 
 async function api(path, body) {
@@ -292,7 +309,7 @@ function currentSettings() {
     folder: $("#folder").value, out: $("#out").value,
     format: $("#format").value, artist: $("#artist").value, album: $("#album").value,
     date_prefix: $("#date_prefix").checked, square_cover: $("#square_cover").checked,
-    song_tags: $("#song_tags").checked,
+    song_tags: $("#song_tags").checked, split_chapters: $("#split_chapters").checked,
     cookies: $("#cookies").value,
     tabs: $$("input[name=tab]:checked").map((c) => c.value),
   };
@@ -305,7 +322,22 @@ function applySettings(s) {
   $("#date_prefix").checked = !!s.date_prefix;
   $("#square_cover").checked = !!s.square_cover;
   $("#song_tags").checked = !!s.song_tags;
+  $("#split_chapters").checked = !!s.split_chapters;
   $$("input[name=tab]").forEach((c) => { c.checked = (s.tabs || []).includes(c.value); });
+}
+
+// A newer release fixes YouTube downloads that stopped working; show it until closed for that version
+function renderUpdate(update) {
+  let hidden = "";
+  try { hidden = localStorage.getItem("hide-update") || ""; } catch {}
+  if (!update || hidden === update.version) return;
+  $("#update-text").innerHTML = `Version ${esc(update.version)} is available, with the newest fixes for YouTube downloads.
+    <a href="${esc(update.url)}" target="_blank" rel="noopener">Download it</a>`;
+  $("#update").hidden = false;
+  $("#update-close").onclick = () => {
+    $("#update").hidden = true;
+    try { localStorage.setItem("hide-update", update.version); } catch {}
+  };
 }
 
 function renderTools(tools) {
@@ -359,22 +391,38 @@ function setItems(list, problems = []) {
   $("#problems").hidden = problems.length === 0;
   $("#problems").innerHTML = problems.length
     ? "Some links couldn't be read:<br>" + problems.map(esc).join("<br>") : "";
-  const sections = new Set(items.map((i) => i.section).filter(Boolean));
+  editing = false;
   const noun = { folder: "files", albums: "tracks" }[mode] || "videos";
   const saved = items.filter((i) => i.done).length;
   const albumCount = mode === "albums" ? new Set(items.map((i) => i.section)).size : 0;
   $("#list-title").textContent = `${items.length} ${noun}` +
     (albumCount ? ` in ${albumCount} ${albumCount === 1 ? "album" : "albums"}` : "") + " found" +
     (saved ? ` · ${saved} already saved` : "");
-  $("#rows").innerHTML = items.length ? items.map((item, i) => {
+  renderRows();
+}
+
+const displayName = (item) => item.name || item.title;
+
+function renderRows() {
+  const sections = new Set(items.map((i) => i.section).filter(Boolean));
+  $("#rows").innerHTML = items.map((item, i) => {
     const tag = sections.size > 1 && item.section ? `<span class="tag">${esc(item.section)}</span>` : "";
     const meta = mode === "folder" ? fmtSize(item.size || 0) : fmtDuration(item.duration);
+    const number = item.track ? `<span class="muted">${item.track}.</span> ` : "";
+    const edited = item.name ? `<span class="edited" title="${esc(item.title)}">edited</span>` : "";
+    const title = editing
+      ? `${number}<input type="text" class="title-edit" value="${esc(displayName(item))}" aria-label="Title">`
+      : `<label for="r${i}">${number}${esc(displayName(item))}${edited}${tag}</label>`;
     return `<tr data-i="${i}">
       <td class="c"><input type="checkbox" id="r${i}" ${selected.has(item.id) ? "checked" : ""}></td>
-      <td class="t"><label for="r${i}">${item.track ? `<span class="muted">${item.track}.</span> ` : ""}${esc(item.title)}${tag}</label></td>
+      <td class="t">${title}</td>
       <td class="m">${meta}</td>
       <td class="s">${statusHtml(item)}</td></tr>`;
-  }).join("") : "";
+  }).join("");
+  $("#edit-titles").textContent = editing ? "Done editing" : "Edit titles";
+  $("#edit-titles").setAttribute("aria-pressed", String(editing));
+  $("#reset-titles").hidden = !items.some((i) => i.name);
+  applyFilter();
   updateCount();
 }
 
@@ -402,15 +450,65 @@ function updateCount() {
 }
 
 $("#rows").addEventListener("change", (e) => {
-  const tr = e.target.closest("tr");
-  const item = items[Number(tr.dataset.i)];
+  if (e.target.type !== "checkbox") return;
+  const item = items[Number(e.target.closest("tr").dataset.i)];
   e.target.checked ? selected.add(item.id) : selected.delete(item.id);
   updateCount();
 });
 
-$("#filter").addEventListener("input", () => {
+$("#rows").addEventListener("input", (e) => {
+  if (!e.target.classList.contains("title-edit")) return;
+  const item = items[Number(e.target.closest("tr").dataset.i)];
+  const name = e.target.value.trim();
+  if (name && name !== item.title) item.name = name;
+  else delete item.name;
+  $("#reset-titles").hidden = !items.some((i) => i.name);
+});
+
+function applyFilter() {
   const q = $("#filter").value.trim().toLowerCase();
-  $$("#rows tr").forEach((tr) => { tr.hidden = q && !items[Number(tr.dataset.i)].title.toLowerCase().includes(q); });
+  $$("#rows tr").forEach((tr) => {
+    const item = items[Number(tr.dataset.i)];
+    tr.hidden = !!q && !`${displayName(item)} ${item.title}`.toLowerCase().includes(q);
+  });
+}
+$("#filter").addEventListener("input", applyFilter);
+
+// ---------- titles ----------
+
+// Extras that don't belong in a song title: (Official Video), [4K], (Lyrics), (Remastered 2009) …
+const EXTRA_WORDS = /\b(official|video|audio|lyrics?|visuali[sz]er|hd|hq|4k|8k|1080p|720p|remaster(ed)?|mv|m\/v|clip|explicit|full song)\b/i;
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function tidyTitle(title, artist) {
+  let t = title.replace(/\s*[([【]([^)\]】]*)[)\]】]/g, (whole, inside) => (EXTRA_WORDS.test(inside) ? "" : whole));
+  t = t.replace(/\s+(\||｜|\/\/)\s+.*$/, "");                 // "Song | Live at …" -> "Song"
+  t = t.replace(/(\s+#[\p{L}\p{N}_]+)+\s*$/u, "");              // trailing #hashtags
+  if (artist) t = t.replace(new RegExp(`^${escapeRegex(artist)}\\s*[-–—:|]\\s*`, "i"), "");
+  t = t.replace(/\s{2,}/g, " ").replace(/^[\s\-–—|:]+|[\s\-–—|:]+$/g, "");
+  return t || title;
+}
+
+$("#tidy-titles").addEventListener("click", () => {
+  for (const tr of visibleRows()) {
+    const item = items[Number(tr.dataset.i)];
+    const artist = item.album_artist || $("#artist").value.trim();
+    const tidy = tidyTitle(displayName(item), artist);
+    if (tidy !== item.title) item.name = tidy;
+    else delete item.name;
+  }
+  renderRows();
+});
+
+$("#edit-titles").addEventListener("click", () => {
+  editing = !editing;
+  renderRows();
+  if (editing) $("#rows input.title-edit")?.focus();
+});
+
+$("#reset-titles").addEventListener("click", () => {
+  items.forEach((item) => delete item.name);
+  renderRows();
 });
 
 $$("[data-select]").forEach((btn) => btn.addEventListener("click", () => {
@@ -586,6 +684,10 @@ $$(".tabs button").forEach((b) => b.addEventListener("click", () => setMode(b.da
     const state = await api("/api/state?items=1");
     applySettings(state.settings);
     renderTools(state.tools);
+    renderUpdate(state.update);
+    setTimeout(async () => {  // the app asks GitHub in the background right after it starts
+      try { renderUpdate((await api("/api/state")).update); } catch {}
+    }, 4000);
     const job = state.job;
     if (job && !job.finished && job.items) {  // page reopened while a job runs
       setMode(job.mode);

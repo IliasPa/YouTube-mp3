@@ -1,0 +1,82 @@
+# Keeps the ready-made apps working. YouTube changes often and yt-dlp follows within days, but
+# each app carries the yt-dlp it was built with. Every week this checks for a yt-dlp release newer
+# than our latest release and, if there is one, publishes a patch version (v0.4 -> v0.4.1) built
+# with it. The apps then show "Version … is available".
+name: Refresh yt-dlp
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only report what would happen"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write  # commit the version bump and push the tag
+  actions: write   # start the build and website workflows
+
+concurrency:
+  group: refresh
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # tags
+
+      - name: Compare yt-dlp with the latest release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest_tag=$(gh release view --json tagName --jq .tagName)
+          released_at=$(gh release view --json publishedAt --jq .publishedAt)
+          pypi=$(curl -fsSL https://pypi.org/pypi/yt-dlp/json)
+          ytdlp=$(jq -r .info.version <<<"$pypi")
+          ytdlp_at=$(jq -r '.urls[0].upload_time_iso_8601' <<<"$pypi")
+          echo "Latest release: $latest_tag ($released_at). Newest yt-dlp: $ytdlp ($ytdlp_at)."
+          if [[ "${ytdlp_at:0:19}" < "${released_at:0:19}" ]]; then
+            echo "The apps already have this yt-dlp."
+            echo "needed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$latest_tag^{commit}")" ]; then
+            echo "::notice::main has changes that aren't released yet; the next release will include yt-dlp $ytdlp."
+            echo "needed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          IFS=. read -r major minor patch <<< "${latest_tag#v}"
+          next="v${major}.${minor}.$(( ${patch:-0} + 1 ))"
+          echo "Publishing $next, built with yt-dlp $ytdlp."
+          { echo "needed=true"; echo "next=$next"; echo "ytdlp=$ytdlp"; } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the patch version
+        if: steps.check.outputs.needed == 'true' && (github.event_name == 'schedule' || !inputs.dry_run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.check.outputs.next }}
+          YTDLP: ${{ steps.check.outputs.ytdlp }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^APP_VERSION = \"[^\"]*\"/APP_VERSION = \"${NEXT#v}\"/" app.py
+          python3 - "$NEXT" "$YTDLP" <<'EOF'
+          import datetime, sys
+          version, ytdlp = sys.argv[1:]
+          text = open("CHANGES.md", encoding="utf-8").read()
+          entry = (f"## {version} — {datetime.date.today():%Y-%m-%d}\n\n### Changed\n\n"
+                   f"- Built with yt-dlp {ytdlp}, to keep YouTube downloads working.\n\n")
+          at = text.index("\n## ") + 1  # above the newest version
+          open("CHANGES.md", "w", encoding="utf-8").write(text[:at] + entry + text[at:])
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "$NEXT: built with yt-dlp $YTDLP"
+          git tag -a "$NEXT" -m "YouTube → MP3 $NEXT"
+          git push origin HEAD:main "$NEXT"
+          # Pushes made with this workflow's token don't start other workflows, so start them here
+          gh workflow run build.yml --ref "$NEXT"
+          gh workflow run pages.yml --ref main

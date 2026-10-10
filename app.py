@@ -20,12 +20,14 @@ import os
 import random
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import traceback
+import urllib.request
 import webbrowser
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
@@ -36,7 +38,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.3"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.4"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -46,6 +48,9 @@ DATA_DIR = Path.home() / ".youtube_to_mp3_deps"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 ARCHIVE_NAME = ".downloaded.txt"  # yt-dlp download archive inside the output folder
 PORTS = range(8765, 8776)
+RELEASES_API = "https://api.github.com/repos/IliasPa/YouTube-mp3/releases/latest"
+RELEASES_PAGE = "https://github.com/IliasPa/YouTube-mp3/releases/latest"
+UPDATE = {}  # {"version", "url"} when GitHub has a newer release (filled in the background)
 PAUSE_BETWEEN = (3, 8)  # seconds between YouTube downloads, so a long run isn't rate-limited
 CHANNEL_TABS = {"videos": "Videos", "streams": "Live", "shorts": "Shorts"}
 MEDIA_EXTS = {".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi", ".flv", ".3gp", ".mpg", ".mpeg",
@@ -74,6 +79,7 @@ DEFAULT_SETTINGS = {
     "date_prefix": True,
     "square_cover": True,
     "song_tags": False,  # off: covers can be linked to the original song and get its artist
+    "split_chapters": False,
     "cookies": "",
 }
 
@@ -115,6 +121,30 @@ def find_js_runtime():
     if nodes:
         return "node", max(nodes, key=lambda p: [int(n) for n in re.findall(r"\d+", Path(p).parents[1].name)])
     return None
+
+
+def version_tuple(text):
+    return tuple(int(n) for n in re.findall(r"\d+", text))
+
+
+def check_for_update():
+    """Asks GitHub for the newest release so the page can offer it: YouTube changes often, and
+    a packaged app keeps working only with a recent yt-dlp. Offline or rate-limited: no notice."""
+    try:
+        import certifi  # the packaged app can't always find the system's certificates
+        context = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        context = ssl.create_default_context()
+    request = urllib.request.Request(RELEASES_API, headers={
+        "Accept": "application/vnd.github+json", "User-Agent": f"YouTube-MP3/{APP_VERSION}"})
+    try:
+        with urllib.request.urlopen(request, timeout=10, context=context) as response:
+            release = json.load(response)
+        latest = release["tag_name"].lstrip("v")
+        if version_tuple(latest) > version_tuple(APP_VERSION):
+            UPDATE.update(version=latest, url=release.get("html_url") or RELEASES_PAGE)
+    except Exception:
+        pass
 
 
 FFMPEG = find_ffmpeg()
@@ -193,7 +223,7 @@ class Job:
         with self.lock:
             self.results[item["id"]] = status
             if status == "failed":
-                self.failed.append({"title": item["title"], "reason": reason})
+                self.failed.append({"title": display_name(item), "reason": reason})
 
     def add_log(self, line):
         line = re.sub(r"\x1b\[[0-9;]*m", "", line).rstrip()
@@ -221,6 +251,11 @@ class Job:
 
 
 JOB = {"current": None}
+
+
+def display_name(item):
+    """The title the user sees and the file gets: their edited title, else the video's."""
+    return (item.get("name") or "").strip() or item["title"]
 
 
 class JobLogger:
@@ -253,6 +288,7 @@ class SetTags(PostProcessor):
         self.artist, self.album, self.song_tags = artist, album, song_tags
         self.album_artist = ""  # album mode: the album's artist
         self.track = ""         # album mode: "3/12"
+        self.title = ""         # a title the user edited; wins over everything else
 
     def run(self, info):
         artists = info.get("artists") or ([info["artist"]] if info.get("artist") else [])
@@ -283,7 +319,46 @@ class SetTags(PostProcessor):
             info["meta_date"] = f"{date[:4]}-{date[4:6]}-{date[6:]}"
         elif date:
             info["meta_date"] = date
+        if self.title:
+            info["meta_title"] = self.title
         return [], info
+
+
+class SplitChapters(PostProcessor):
+    """Cuts a video with chapters (e.g. a live set) into one file per chapter, in a folder named
+    after the video: numbered tracks titled by chapter, with the video's title as the album.
+    Runs last, so every part keeps the finished file's tags and cover."""
+
+    def __init__(self):
+        super().__init__()
+        self.album = ""  # the job sets the video's (possibly edited) title per video
+
+    def run(self, info):
+        path = Path(info.get("filepath") or "")
+        chapters = [c for c in info.get("chapters") or [] if c.get("end_time", 0) > c.get("start_time", 0)]
+        if len(chapters) < 2 or not path.is_file():
+            return [], info
+        split_into_chapters(path, chapters, self.album or info.get("title") or path.stem)
+        return [], info
+
+
+def split_into_chapters(path, chapters, album):
+    """Writes "<file name>/01 - <chapter>.<ext>" for each chapter and removes the full file."""
+    folder = path.with_suffix("")
+    folder.mkdir(exist_ok=True)
+    width = max(2, len(str(len(chapters))))
+    for number, chapter in enumerate(chapters, 1):
+        title = (chapter.get("title") or "").strip() or f"Part {number}"
+        dest = folder / f"{str(number).zfill(width)} - {folder_name(title)}{path.suffix}"
+        start, end = chapter["start_time"], chapter["end_time"]
+        subprocess.run(
+            [FFMPEG, "-nostdin", "-loglevel", "error", "-y", "-ss", f"{start:.3f}", "-i", str(path),
+             "-t", f"{end - start:.3f}", "-map", "0", "-c", "copy", "-map_chapters", "-1",
+             "-metadata", f"title={title}", "-metadata", f"track={number}/{len(chapters)}",
+             "-metadata", f"album={album}", str(dest)],
+            check=True, capture_output=True)
+    path.unlink()
+    return folder
 
 
 class SquareCover(PostProcessor):
@@ -521,21 +596,24 @@ def run_youtube_job(job, settings):
     # ignoreerrors=False so a failed video raises and is reported, instead of silently counting as saved
     opts.update(logger=JobLogger(job), noprogress=True, progress_hooks=[progress], ignoreerrors=False)
     albums = job.mode == "albums"
-    name = "%(title)s"
-    if settings["date_prefix"]:
-        name = "%(upload_date>%Y-%m-%d)s - " + name
+    date_prefix = "%(upload_date>%Y-%m-%d)s - " if settings["date_prefix"] else ""
+    # Two videos that would get the same file name (e.g. titles edited alike) get the video id added
+    name_counts = Counter(display_name(i).casefold() for i in job.items)
     # Albums take artist and album from each album; the other tabs from the settings
     tags = SetTags() if albums else SetTags(settings["artist"].strip(), settings["album"].strip(), settings["song_tags"])
+    splitter = SplitChapters() if settings["split_chapters"] and not albums and FFMPEG else None
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.add_post_processor(tags, when="pre_process")
         if settings["square_cover"] and FFMPEG:
             ydl.add_post_processor(SquareCover(), when="before_dl")  # runs after the jpg conversion
+        if splitter:
+            ydl.add_post_processor(splitter, when="post_process")  # after the tags and cover are in
         downloaded_any = False
         for job.index, item in enumerate(job.items, 1):
             if job.cancel:
                 break
-            job.current, job.stage, job.percent = item["title"], "Starting", 0.0
+            job.current, job.stage, job.percent = display_name(item), "Starting", 0.0
             if item["id"] in archive:
                 job.set_result(item, "skipped")
                 continue
@@ -545,14 +623,20 @@ def run_youtube_job(job, settings):
                 if job.cancel:
                     break
             job.set_result(item, "working")
+            custom = (item.get("name") or "").strip()  # a title the user edited
+            tags.title = custom
+            title = folder_name(custom).replace("%", "%%") if custom else None
             if albums:  # "Artist - Album/03 - Track.mp3"
                 tags.album, tags.album_artist = item.get("album", ""), item.get("album_artist", "")
                 tags.track = f"{item['track']}/{item['tracks']}"
                 folder = folder_name(" - ".join(filter(None, (tags.album_artist, tags.album))))
                 number = str(item["track"]).zfill(max(2, len(str(item["tracks"]))))
-                template = f"{folder.replace('%', '%%')}/{number} - %(track,title)s.%(ext)s"
+                template = f"{folder.replace('%', '%%')}/{number} - {title or '%(track,title)s'}.%(ext)s"
             else:
-                template = name + (" [%(id)s]" if item.get("dup") else "") + ".%(ext)s"
+                dup = item.get("dup") or name_counts[display_name(item).casefold()] > 1
+                template = date_prefix + (title or "%(title)s") + (" [%(id)s]" if dup else "") + ".%(ext)s"
+            if splitter:
+                splitter.album = display_name(item)
             ydl.params["outtmpl"]["default"] = template
             try:
                 ydl.download([item["url"]])
@@ -627,7 +711,8 @@ def run_folder_job(job, settings):
         if job.cancel:
             break
         src = Path(item["id"])
-        job.current, job.stage, job.percent = item["title"], "Converting", 0.0
+        job.current, job.stage, job.percent = display_name(item), "Converting", 0.0
+        stem = folder_name(item["name"]) if (item.get("name") or "").strip() else src.stem
         if settings["format"] == "original":
             codec = audio_codec(src)
             if codec and codec.startswith("pcm_"):
@@ -639,15 +724,15 @@ def run_folder_job(job, settings):
         else:
             ext = "mp3"
             codec_args = ["-c:a", "libmp3lame", "-b:a", "320k" if settings["format"] == "mp3_320" else "192k"]
-        dest = out / f"{src.stem}.{ext}"
+        dest = out / f"{stem}.{ext}"
         if dest.exists() and not item.get("force"):
             job.set_result(item, "skipped")
             continue
         job.set_result(item, "working")
-        tmp = out / f"{src.stem}.part.{ext}"  # renamed when complete, so a stopped run leaves no half file
+        tmp = out / f"{stem}.part.{ext}"  # renamed when complete, so a stopped run leaves no half file
         cmd = [FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
                "-map", "0:a:0", "-map_metadata", "-1", *codec_args,  # drop the video container's own tags
-               "-metadata", f"title={src.stem}", *tags, str(tmp)]
+               "-metadata", f"title={display_name(item)}", *tags, str(tmp)]
         job.add_log("Converting " + src.name)
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, **TEXT)
         while proc.poll() is None:
@@ -767,6 +852,7 @@ def get_state(with_items):
             "ytdlp": yt_dlp.version.__version__,
         },
         "job": job.snapshot(with_items) if job else None,
+        "update": UPDATE or None,
     }
 
 
@@ -867,6 +953,21 @@ def self_test(online):
             check(job.results.get(str(video)) == "ok" and (tmp / fmt / f"{video.stem}.{ext}").is_file(),
                   f"video file converted to .{ext}")
 
+        # A "live set" with three chapters becomes three numbered tracks
+        live = tmp / "Live set.mp3"
+        subprocess.run([*lavfi, "sine=frequency=330:duration=6", "-c:a", "libmp3lame", "-b:a", "128k",
+                        "-metadata", "artist=Test", str(live)], check=True)
+        chapters = [{"start_time": 0, "end_time": 2, "title": "Intro"},
+                    {"start_time": 2, "end_time": 4, "title": "Σπάνιο: τραγούδι?"},
+                    {"start_time": 4, "end_time": 6, "title": ""}]
+        folder = split_into_chapters(live, chapters, "Live set")
+        parts = sorted(p.name for p in folder.iterdir())
+        probe = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(folder / parts[1])],
+                               capture_output=True, **TEXT).stderr if len(parts) == 3 else ""
+        check(len(parts) == 3 and parts[0] == "01 - Intro.mp3" and parts[2] == "03 - Part 3.mp3"
+              and not live.exists() and re.search(r"track\s*: 2/3", probe) and re.search(r"album\s*: Live set", probe),
+              f"live set split into chapters: {parts}")
+
         if online:  # YouTube sometimes blocks cloud machines, so CI treats this part as optional
             item = {"id": "jNQXAC9IVRw", "title": "Me at the zoo", "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"}
             job = Job("youtube", [item])
@@ -907,6 +1008,7 @@ def main():
         print("  ! ffmpeg not found. Run Start.command / Start.bat / start.sh again to install it.\n")
     if not JS_RUNTIME:
         print("  ! No JavaScript runtime found; YouTube downloads may fail.\n")
+    threading.Thread(target=check_for_update, daemon=True).start()
     if "--no-browser" not in sys.argv:
         threading.Timer(0.6, webbrowser.open, [url]).start()
     try:

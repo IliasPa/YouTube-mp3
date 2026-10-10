@@ -31,7 +31,10 @@ A small window stays open while the app works (close it to quit) and the app ope
 2. Check **Artist**, **Album** and **Save to** in Settings. Tick **Use the song's own details**
    to tag songs that YouTube Music knows with their real title, artist, album and release date
    (it's off by default because YouTube can link a cover version to the original song).
-3. Press **Download**. A big channel takes hours. You can press **Stop** (or close the app) and
+   **Split videos with chapters** turns a live stream or concert into numbered songs.
+3. Optional: press **Tidy titles** to remove extras like "(Official Video)" or "[4K]" from the
+   titles, or **Edit titles** to rename songs. Files are named and tagged with your titles.
+4. Press **Download**. A big channel takes hours. You can press **Stop** (or close the app) and
    continue another day: songs that are already saved are skipped.
 
 ### Private/unlisted videos, or the best quality: Google Takeout
@@ -85,6 +88,11 @@ installs everything from `requirements.txt`; later starts update yt-dlp.
 - GitHub Actions ([build.yml](.github/workflows/build.yml)) builds and tests on Windows, macOS
   and Linux for every push. The website in `docs/` is published by
   [pages.yml](.github/workflows/pages.yml).
+- [refresh.yml](.github/workflows/refresh.yml) runs every Monday: when yt-dlp has a release newer
+  than ours (and everything on `main` is released), it commits a patch version (e.g. v0.4.1) with a
+  CHANGES.md entry, tags it and starts the build, so the ready-made apps keep working. Run it by hand
+  from the Actions tab; it only reports what it would do unless you untick "dry run". Pull before
+  you start new work, since it may have committed to `main`.
 
 **Releasing a new version:** set `APP_VERSION` in `app.py`, add a section to the top of
 [CHANGES.md](CHANGES.md), commit, then tag and push, e.g. `git tag v0.1 && git push origin main v0.1`.
