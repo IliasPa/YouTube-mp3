@@ -1,0 +1,106 @@
+# Builds and tests the app on Windows, macOS and Linux for every change.
+# Pushing a version tag (e.g. v0.1) also publishes a GitHub release with the three apps,
+# using that version's section of CHANGES.md as the release notes.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: App (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, system: windows }
+          - { os: macos-latest, system: macos }
+          - { os: ubuntu-latest, system: linux }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Self-test from source
+        run: python app.py --self-test
+      - name: Build the app
+        run: python build.py
+      - name: Self-test the built app
+        run: python build.py --test
+      # YouTube often blocks cloud machines, so a failure here is a warning, not an error
+      - name: Built app downloads from YouTube (optional)
+        continue-on-error: true
+        run: python build.py --test --online
+      - uses: actions/upload-artifact@v7
+        with:
+          name: YouTube-MP3-${{ matrix.system }}
+          path: dist/YouTube-MP3-${{ matrix.system }}.*
+          if-no-files-found: error
+          compression-level: 0  # already compressed
+
+  launchers:
+    name: Launcher (${{ matrix.os }})
+    # What someone running from the source code gets: the launcher creates the
+    # environment, installs everything and starts the app (here: its self-test)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Start.bat
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: echo.| Start.bat --self-test
+      - name: Start.command
+        if: runner.os == 'macOS'
+        run: ./Start.command --self-test < /dev/null
+      - name: start.sh
+        if: runner.os == 'Linux'
+        run: ./start.sh --self-test < /dev/null
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, launchers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag matches the app version
+        run: |
+          grep -q "^APP_VERSION = \"${GITHUB_REF_NAME#v}\"" app.py || {
+            echo "::error::Tag ${GITHUB_REF_NAME} doesn't match APP_VERSION in app.py"; exit 1; }
+      - name: Release notes from CHANGES.md
+        run: |
+          python3 - "$GITHUB_REF_NAME" > notes.md <<'EOF'
+          import re, sys
+          text = open("CHANGES.md", encoding="utf-8").read()
+          match = re.search(rf"^## {re.escape(sys.argv[1])}\b[^\n]*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+          if not match:
+              sys.exit(f"No section for {sys.argv[1]} in CHANGES.md")
+          print(match.group(1).strip())
+          EOF
+          cat notes.md
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "YouTube → MP3 $GITHUB_REF_NAME" --notes-file notes.md

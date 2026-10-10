@@ -1,0 +1,6 @@
+# yt-dlp does the YouTube work; [default] adds yt-dlp-ejs, which solves YouTube's JavaScript challenges
+yt-dlp[default]
+# ffmpeg converts the audio; this package ships a ready-made ffmpeg for Windows, macOS and Linux
+imageio-ffmpeg
+# Deno is the JavaScript runtime yt-dlp uses for those challenges
+deno

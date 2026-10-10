@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube to MP3</title>
+<meta name="description" content="A free app that saves the audio of your YouTube uploads as music files, with title, date, artist and cover art. For Windows, macOS and Linux.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c8372d'/%3E%3Cpath d='M13 8v11.2a4 4 0 1 0 2 3.5V12h7V8z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f5f3ef; --card: #ffffff; --text: #1c1b1a; --muted: #6b6862; --line: #e4e0d8; --soft: #efece6;
+    --accent: #c8372d; --accent-hover: #a92c23; --accent-text: #ffffff; --focus: #2b6cb0;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1f1e1c; --text: #f1efea; --muted: #a29e96; --line: #34322e; --soft: #2a2926;
+      --accent: #ef5b4f; --accent-hover: #ff7166; --accent-text: #1a0d0b; --focus: #7fb0f0;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .brand { font-weight: 700; font-size: 17px; color: var(--text); text-decoration: none; display: flex; gap: 10px; align-items: center; }
+  .brand svg { flex: none; }
+  nav a.gh { color: var(--muted); text-decoration: none; font-size: 15px; }
+  nav a.gh:hover { color: var(--text); }
+
+  .hero { padding: 40px 0 28px; }
+  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 16px; max-width: 14em; }
+  .lead { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+  .download { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+  .button { display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: var(--accent-text);
+            text-decoration: none; font-weight: 650; font-size: 17px; padding: 13px 22px; border-radius: 12px; }
+  .button:hover { background: var(--accent-hover); }
+  .meta { color: var(--muted); font-size: 14px; }
+  .others { margin: 14px 0 0; font-size: 15px; color: var(--muted); }
+  .others a { margin-right: 4px; }
+  .fine { font-size: 14px; color: var(--muted); margin: 18px 0 0; }
+
+  section { padding: 34px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 24px; letter-spacing: -0.01em; margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card h3 { font-size: 16px; margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .step { display: inline-flex; width: 28px; height: 28px; border-radius: 50%; background: var(--soft); color: var(--accent);
+          font-weight: 700; align-items: center; justify-content: center; margin-bottom: 10px; }
+  code { font: 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft);
+         padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+  .os h3 { display: flex; gap: 8px; align-items: center; }
+  .os ol { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  .os li + li { margin-top: 4px; }
+
+  .changes h3 { font-size: 19px; margin: 26px 0 4px; }
+  .changes h3:first-child { margin-top: 0; }
+  .changes h4 { font-size: 15px; margin: 16px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .changes ul { margin: 0; padding-left: 20px; }
+  .changes li + li { margin-top: 4px; }
+  .changes p { margin: 6px 0; }
+  .changes > p:first-child { color: var(--muted); }
+
+  footer { padding: 28px 0 40px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="./">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor" style="color:var(--accent)"/><path d="M13 8v11.2a4 4 0 1 0 2 3.5V12h7V8z" fill="#fff"/></svg>
+      YouTube → MP3
+    </a>
+    <a class="gh" href="https://github.com/IliasPa/YouTube-mp3">Source on GitHub</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Your YouTube uploads, as music files.</h1>
+    <p class="lead">A free app that saves the audio of your videos as MP3s, with title, date, artist and cover art
+      filled in. It runs on your own computer: Windows, macOS or Linux, nothing else to install.</p>
+    <div class="download">
+      <a class="button" id="primary" href="https://github.com/IliasPa/YouTube-mp3/releases/latest">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="primary-label">Download</span>
+      </a>
+      <span class="meta" id="primary-meta"></span>
+    </div>
+    <p class="others" id="others">
+      Also for: <a data-os="windows" href="#">Windows</a> · <a data-os="macos" href="#">macOS (Apple Silicon)</a> ·
+      <a data-os="linux" href="#">Linux</a> · <a href="https://github.com/IliasPa/YouTube-mp3#run-from-the-source-code">source code</a>
+    </p>
+    <p class="fine" id="mobile-note" hidden>This app runs on computers. Open this page on your Windows PC, Mac or Linux computer to download it.</p>
+    <p class="fine">Made for downloading your own uploads. Only download videos you have the rights to.</p>
+  </header>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="grid">
+      <div class="card"><div class="step">1</div><h3>Paste your channel link</h3>
+        <p>The app lists all your videos, live streams and Shorts. Tick the ones you want, or all of them.</p></div>
+      <div class="card"><div class="step">2</div><h3>Choose the details</h3>
+        <p>MP3 320 kbps or the original audio, your artist and album name, and where to save the songs.</p></div>
+      <div class="card"><div class="step">3</div><h3>Download</h3>
+        <p>Big channels take a while. Stop any time: songs already saved are skipped when you continue.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you get</h2>
+    <div class="grid">
+      <div class="card"><h3>Tagged songs</h3><p>Title, upload date, artist, album and the video thumbnail as square cover art.</p></div>
+      <div class="card"><h3>Tidy file names</h3><p>Like <code>2021-03-14 - Song title.mp3</code>, so songs sort by date.</p></div>
+      <div class="card"><h3>Private videos too</h3><p>Convert a Google Takeout export of your channel, including private and unlisted videos.</p></div>
+      <div class="card"><h3>Original quality</h3><p>Keep YouTube's own audio without re-encoding, or the audio from your original uploads.</p></div>
+      <div class="card"><h3>Picks up where it stopped</h3><p>Saved songs are remembered, so long runs can be split over several days.</p></div>
+      <div class="card"><h3>Stays on your computer</h3><p>No accounts, no uploads to a server. The app opens in your browser but runs locally.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The first start</h2>
+    <p class="meta" style="margin:-8px 0 16px">The apps aren't signed with a paid certificate, so your system asks once before opening them.</p>
+    <div class="grid os">
+      <div class="card"><h3>Windows</h3><ol>
+        <li>Unzip the download.</li>
+        <li>Double-click <code>YouTube-MP3.exe</code>.</li>
+        <li>If you see “Windows protected your PC”, click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+      </ol></div>
+      <div class="card"><h3>macOS</h3><ol>
+        <li>Unzip the download.</li>
+        <li>Open Terminal, type <code>xattr -dr com.apple.quarantine</code> and a space, drag the <code>YouTube-MP3</code> folder in, press Enter.</li>
+        <li>Double-click <code>YouTube-MP3</code>.</li>
+      </ol></div>
+      <div class="card"><h3>Linux</h3><ol>
+        <li>Extract the download.</li>
+        <li>Run <code>./YouTube-MP3</code> in that folder.</li>
+        <li>Optional: install <code>zenity</code> for the folder picker.</li>
+      </ol></div>
+    </div>
+    <p class="fine">A small window stays open while the app works; close it to quit. The app opens in your browser.</p>
+  </section>
+
+  <section>
+    <h2>Private or unlisted videos? Use Google Takeout</h2>
+    <p style="margin:0 0 10px">The YouTube tab only sees public videos. Google Takeout gives you every video you uploaded,
+      in the quality you uploaded it:</p>
+    <ol style="margin:0;padding-left:20px">
+      <li>On <a href="https://takeout.google.com">takeout.google.com</a>, press <strong>Deselect all</strong> and tick
+        <strong>YouTube and YouTube Music</strong>. Under <strong>All YouTube data included</strong>, keep only <strong>videos</strong>.</li>
+      <li>Download the export when Google emails you, and unzip it.</li>
+      <li>In the app, open <strong>From video files on this computer</strong>, choose the folder and press <strong>Convert</strong>.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2 id="changes">Changes</h2>
+    <div class="changes" id="changes-body">
+      <p>See the <a href="https://github.com/IliasPa/YouTube-mp3/blob/main/CHANGES.md">list of changes on GitHub</a>.</p>
+    </div>
+  </section>
+
+  <footer>
+    Built on <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a>, <a href="https://ffmpeg.org">ffmpeg</a> and
+    <a href="https://deno.com">Deno</a>. Not affiliated with YouTube or Google.
+    · <a href="https://github.com/IliasPa/YouTube-mp3">Source on GitHub</a>
+  </footer>
+</div>
+
+<script>
+const REPO = "IliasPa/YouTube-mp3";
+const ASSETS = {
+  windows: { file: "YouTube-MP3-windows.zip", label: "Download for Windows" },
+  macos: { file: "YouTube-MP3-macos.zip", label: "Download for macOS" },
+  linux: { file: "YouTube-MP3-linux.tar.gz", label: "Download for Linux" },
+};
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const assetUrl = (os) => `https://github.com/${REPO}/releases/latest/download/${ASSETS[os].file}`;
+
+function detectOS() {
+  const ua = navigator.userAgent;
+  const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  if (/Android|iPhone|iPad|iPod/i.test(ua) || (/Mac/.test(platform) && navigator.maxTouchPoints > 1)) return "mobile";
+  if (/Win/i.test(platform) || /Windows/.test(ua)) return "windows";
+  if (/Mac/i.test(platform) || /Mac OS/.test(ua)) return "macos";
+  if (/Linux|X11|CrOS/i.test(platform + ua)) return "linux";
+  return "windows";
+}
+
+const os = detectOS();
+const primaryOS = os === "mobile" ? "windows" : os;
+document.getElementById("primary").href = assetUrl(primaryOS);
+document.getElementById("primary-label").textContent = ASSETS[primaryOS].label;
+document.getElementById("mobile-note").hidden = os !== "mobile";
+for (const link of document.querySelectorAll("[data-os]")) link.href = assetUrl(link.dataset.os);
+
+// Version and size of the latest release (the buttons work without this)
+fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+  .then((r) => (r.ok ? r.json() : Promise.reject()))
+  .then((release) => {
+    const asset = release.assets.find((a) => a.name === ASSETS[primaryOS].file);
+    const size = asset ? ` · ${Math.round(asset.size / 1e6)} MB` : "";
+    document.getElementById("primary-meta").textContent = `${release.tag_name}${size} · free`;
+  })
+  .catch(() => {});
+
+// The changes list comes straight from CHANGES.md in the repository
+function inline(text) {
+  return esc(text)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+}
+
+function renderMarkdown(md) {
+  const html = [];
+  let para = [], list = null;
+  const flush = () => {
+    if (para.length) html.push(`<p>${inline(para.join(" "))}</p>`);
+    if (list) html.push(`<ul>${list.map((item) => `<li>${inline(item)}</li>`).join("")}</ul>`);
+    para = [];
+    list = null;
+  };
+  for (const raw of md.split(/\r?\n/)) {
+    const line = raw.trim();
+    let m;
+    if (!line) { flush(); continue; }
+    if ((m = line.match(/^(#{1,4}) (.*)$/))) {
+      flush();
+      const level = m[1].length;
+      if (level > 1) html.push(`<h${level + 1}>${inline(m[2])}</h${level + 1}>`);  // the page has its own title
+      continue;
+    }
+    if ((m = line.match(/^[-*] (.*)$/))) { if (para.length) flush(); (list ||= []).push(m[1]); continue; }
+    if (list && /^\s/.test(raw)) { list[list.length - 1] += " " + line; continue; }  // wrapped list item
+    para.push(line);
+  }
+  flush();
+  return html.join("\n");
+}
+
+fetch("CHANGES.md")
+  .then((r) => (r.ok ? r.text() : Promise.reject()))
+  .then((md) => { document.getElementById("changes-body").innerHTML = renderMarkdown(md); })
+  .catch(() => {});
+</script>
+</body>
+</html>
