@@ -23,24 +23,28 @@ A small window stays open while the app works (close it to quit) and the app ope
 
 ## Use it
 
-The page is in English or Greek: switch with the flags at the top.
+The page is in English or Greek: switch with the flags at the top. The ⚙ next to them opens the settings.
 
 1. Paste your channel link, e.g. `https://www.youtube.com/@yourname`, and press **Find videos**.
-   Or open **Paste links** and paste the links of the videos or playlists you want, one per line
+   Or open **Links** and paste the links of the videos or playlists you want, one per line
    (a whole message works too). Unlisted videos work there, as long as you have their link.
-   For whole albums, open **Album links** and paste YouTube Music album links: each album gets
+   For whole albums, open **Albums** and paste YouTube Music album links: each album gets
    its own folder (`Artist - Album/01 - Track.mp3`) with track numbers, album tags and cover.
-2. Check **Artist**, **Album** and **Save to** in Settings. Tick **Use the song's own details**
-   to tag songs that YouTube Music knows with their real title, artist, album and release date
-   (it's off by default because YouTube can link a cover version to the original song).
-   **Split videos with chapters** turns a live stream or concert into numbered songs.
+2. Open **Settings** (⚙) and check **Artist**, **Album** and **Save to**. Tick **Use the song's
+   details from YouTube Music** to tag songs that YouTube Music knows with their real title, artist,
+   album and release date (it's off by default because YouTube can link a cover version to the
+   original song). **Split videos with chapters** turns a live stream or concert into numbered songs.
    Under **For the music itself** you can choose lossless FLAC or WAV, even out the volume of
-   all songs (-14 LUFS), use your own cover image, and save each video's description (your
-   lyrics or credits) as the song's lyrics.
-3. Optional: press **Tidy titles** to remove extras like "(Official Video)" or "[4K]" from the
-   titles, or **Edit titles** to rename songs. Files are named and tagged with your titles.
-4. Press **Download**. A big channel takes hours. You can press **Stop** (or close the app) and
-   continue another day: songs that are already saved are skipped.
+   all songs (-14 LUFS), trim the silence at the start and end of each song, use your own cover
+   image, and save each video's description (your lyrics or credits) as the song's lyrics.
+3. Optional: sort the list by title or length, and hold Shift while clicking to tick or untick
+   all the songs in between. Press **Tidy titles** to remove extras like "(Official Video)" or
+   "[4K]" from the titles, or **Edit titles** to rename songs. Files are named and tagged with your
+   titles, and downloaded in the order shown.
+4. Press **Download**. A big channel takes hours: the page and the browser tab show how far it is
+   and about how long is left, and a sound and a notification tell you when it's done (you can
+   turn them off in Settings). You can press **Stop** (or close the app) and continue another
+   day: songs that are already saved are skipped.
 
 ### Private/unlisted videos, or the best quality: Google Takeout
 
@@ -50,7 +54,7 @@ your own uploaded files, private and unlisted ones included.
 1. Go to <https://takeout.google.com>, press **Deselect all**, tick **YouTube and YouTube Music**,
    and under **All YouTube data included** keep only **videos**. Create the export.
 2. When Google emails you, download the .zip file(s) and unzip them.
-3. In the app, open the **From video files on this computer** tab, choose the unzipped folder,
+3. In the app, open the **Video files** tab, choose the unzipped folder,
    press **Find files**, then **Convert**.
 
 ### Where things are
@@ -64,7 +68,7 @@ your own uploaded files, private and unlisted ones included.
 ### If something goes wrong
 
 - **Many songs fail with "Sign in to confirm you're not a bot"**: YouTube is limiting your computer.
-  Wait an hour and press Download again. Or, under Settings → *If YouTube blocks the downloads*,
+  Wait an hour and press Download again. Or, under Settings (⚙) → *If YouTube blocks the downloads*,
   choose the browser where you are signed in to YouTube.
 - **Downloads stopped working after a while**: YouTube changes often. Get the newest release, or,
   when running from the source code, just start it again: it updates yt-dlp on every start.

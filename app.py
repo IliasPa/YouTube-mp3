@@ -39,7 +39,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.5"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.6"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
@@ -63,6 +63,7 @@ FORMATS = ("mp3_320", "mp3_192", "flac", "wav", "original")
 COVER_EXTS = ("mp3", "flac", "m4a")  # containers ffmpeg can put a cover picture in
 SQUARE_CROP = "crop='min(iw,ih)':'min(iw,ih)'"  # centre square of a picture
 LOUDNORM = "loudnorm=I=-14:TP=-1.5:LRA=11"  # -14 LUFS, true peak -1.5 dB: what streaming services use
+SILENCE = "silencedetect=noise=-50dB:d=0.5"  # half a second or more below -50 dB counts as silence
 EXTRACT_AUDIO_ARGS = "extractaudio+ffmpeg_o"  # where yt-dlp looks for extra ffmpeg options when converting
 BLOCKED_SIGNS = ("not a bot", "HTTP Error 429", "rate-limit", "rate limit")
 # A YouTube link anywhere in pasted text: videos, youtu.be, Shorts, live, playlists, channels, YouTube Music
@@ -89,6 +90,8 @@ DEFAULT_SETTINGS = {
     "normalize": False,  # even out the volume
     "cover": "",         # the user's own cover image; empty: the video thumbnail
     "lyrics": False,     # the video description as lyrics
+    "trim_silence": False,  # cut silence at the start and end of each song
+    "notify": True,      # sound and notification when a run finishes
     "lang": "",          # "en" or "el"; empty: the browser's language
     "cookies": "",
 }
@@ -113,8 +116,8 @@ MESSAGES_EL = {
     "https://music.youtube.com/playlist?list=OLAK5uy_… one per line.":
         "Δεν βρέθηκαν σύνδεσμοι άλμπουμ. Επικολλήστε συνδέσμους άλμπουμ του YouTube Music, όπως "
         "https://music.youtube.com/playlist?list=OLAK5uy_…, έναν ανά γραμμή.",
-    "{url}: this is a single video, not an album. Use Paste links for it.":
-        "{url}: αυτό είναι ένα μεμονωμένο βίντεο, όχι άλμπουμ. Χρησιμοποιήστε την «Επικόλληση συνδέσμων».",
+    "{url}: this is a single video, not an album. Use the Links tab for it.":
+        "{url}: αυτό είναι ένα μεμονωμένο βίντεο, όχι άλμπουμ. Χρησιμοποιήστε την καρτέλα «Σύνδεσμοι».",
     "No YouTube links found. Paste links like https://www.youtube.com/watch?v=… or https://youtu.be/…, one per line.":
         "Δεν βρέθηκαν σύνδεσμοι YouTube. Επικολλήστε συνδέσμους όπως https://www.youtube.com/watch?v=… "
         "ή https://youtu.be/…, έναν ανά γραμμή.",
@@ -135,10 +138,10 @@ MESSAGES_EL = {
     "That folder doesn't exist yet. It's created when the first song is saved.":
         "Ο φάκελος δεν υπάρχει ακόμη. Θα δημιουργηθεί μόλις αποθηκευτεί το πρώτο τραγούδι.",
     "YouTube is temporarily blocking downloads from this computer. Wait an hour and press Download again "
-    "(saved songs are skipped), or pick your browser under \"If YouTube blocks the downloads\".":
+    "(saved songs are skipped), or pick your browser in Settings (⚙) under \"If YouTube blocks the downloads\".":
         "Το YouTube μπλοκάρει προσωρινά τις λήψεις από αυτόν τον υπολογιστή. Περιμένετε μία ώρα και πατήστε "
-        "ξανά «Λήψη» (τα αποθηκευμένα τραγούδια παραλείπονται) ή επιλέξτε τον περιηγητή σας στο "
-        "«Αν το YouTube μπλοκάρει τις λήψεις».",
+        "ξανά «Λήψη» (τα αποθηκευμένα τραγούδια παραλείπονται) ή επιλέξτε τον περιηγητή σας στις "
+        "Ρυθμίσεις (⚙), στο «Αν το YouTube μπλοκάρει τις λήψεις».",
     "This file has no audio track.": "Αυτό το αρχείο δεν έχει ήχο.",
     "Something went wrong: {error}": "Κάτι πήγε στραβά: {error}",
     "Unexpected error: {error}": "Απρόσμενο σφάλμα: {error}",
@@ -283,10 +286,14 @@ class Job:
         self.message = ""
         self.cancel = False
         self.finished = False
+        self.started = time.time()
+        self.done_at = 0.0  # seconds from the start when the last song was saved or failed (for the time left)
 
     def set_result(self, item, status, reason=""):
         with self.lock:
             self.results[item["id"]] = status
+            if status in ("ok", "failed"):
+                self.done_at = time.time() - self.started
             if status == "failed":
                 self.failed.append({"title": display_name(item), "reason": reason})
 
@@ -306,6 +313,7 @@ class Job:
                 "percent": round(self.percent, 1), "ok": counts["ok"], "skipped": counts["skipped"],
                 "failed": list(self.failed), "results": dict(self.results),
                 "message": self.message, "cancelled": self.cancel, "finished": self.finished,
+                "elapsed": round(time.time() - self.started, 1), "done_at": round(self.done_at, 1),
                 "log": list(self.log)[-80:],
             }
 
@@ -446,44 +454,103 @@ class SquareCover(PostProcessor):
         return [], info
 
 
-def loudness_filter(path):
-    """Measures a file's loudness and returns (filter, sample rate) that bring it to -14 LUFS, the
-    level of streaming services, in one even volume change (linear), so the music's dynamics stay
-    as they are. None if it can't be measured (e.g. silence)."""
+def measure_audio(path, loudness=True, silence=False):
+    """One pass over a file that measures its loudness and/or finds the silence at its start and end.
+    Returns {"loudness": filter that brings it to -14 LUFS, the level of streaming services, in one
+    even volume change (linear) so the music keeps its dynamics, "rate": its sample rate,
+    "trim": (start, end or None) of the part to keep}. A key is missing when it doesn't apply
+    (e.g. the file is silence, or has no silence to cut)."""
+    filters = ([SILENCE] if silence else []) + ([LOUDNORM + ":print_format=json"] if loudness else [])
     result = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(path), "-vn",
-                             "-af", LOUDNORM + ":print_format=json", "-f", "null", "-"], capture_output=True, **TEXT)
-    match = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", result.stderr)
-    if result.returncode or not match:
-        return None
-    try:
-        found = json.loads(match.group(0))
-        m = {k: float(found[k]) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
-    except (KeyError, ValueError):
-        return None
-    if not all(math.isfinite(v) for v in m.values()):
-        return None
-    rate = re.search(r"Audio: .*?, (\d+) Hz", result.stderr)  # loudnorm itself outputs 192 kHz
-    return (f"{LOUDNORM}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
-            f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true",
-            int(rate.group(1)) if rate else 48000)
+                             "-af", ",".join(filters), "-f", "null", "-"], capture_output=True, **TEXT)
+    found = {}
+    if result.returncode:
+        return found
+    if loudness and (match := re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", result.stderr)):
+        try:
+            values = json.loads(match.group(0))
+            m = {k: float(values[k]) for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")}
+        except (KeyError, ValueError):
+            m = {}
+        if m and all(math.isfinite(v) for v in m.values()):
+            rate = re.search(r"Audio: .*?, (\d+) Hz", result.stderr)  # loudnorm itself outputs 192 kHz
+            found["loudness"] = (f"{LOUDNORM}:measured_I={m['input_i']}:measured_TP={m['input_tp']}"
+                                 f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}"
+                                 f":offset={m['target_offset']}:linear=true")
+            found["rate"] = int(rate.group(1)) if rate else 48000
+    if silence and (trim := part_to_keep(result.stderr)):
+        found["trim"] = trim
+    return found
 
 
-class MeasureLoudness(PostProcessor):
-    """Runs just before yt-dlp's audio conversion: measures the download and hands the matching
-    volume change to the converter, so each song is encoded only once."""
+def part_to_keep(log):
+    """Reads silencedetect's report: (start, end) of the audio without the silence at its start and
+    end; end is None when the audio doesn't end in silence. None when there's nothing to cut."""
+    periods = []
+    for kind, value in re.findall(r"silence_(start|end): (-?[\d.]+)", log):
+        if kind == "start":
+            periods.append([max(0.0, float(value)), None])
+        elif periods:
+            periods[-1][1] = float(value)
+    if not periods:
+        return None
+    times = re.findall(r"time=(\d+):(\d+):([\d.]+)", log)  # ffmpeg's last progress line: the audio's length
+    length = int(times[-1][0]) * 3600 + int(times[-1][1]) * 60 + float(times[-1][2]) if times else None
+    first, last = periods[0], periods[-1]
+    start = first[1] if first[0] <= 0.1 and first[1] is not None else 0.0
+    ends_silent = last[1] is None or (length is not None and last[1] >= length - 0.1)
+    end = last[0] if ends_silent else None
+    if end is not None and end - start < 1:  # (almost) all silence: leave it alone
+        return None
+    if start == 0.0 and end is None:
+        return None
+    return round(start, 3), (round(end, 3) if end is not None else None)
 
-    def __init__(self, job):
+
+def conversion_args(found):
+    """ffmpeg options that apply what measure_audio found while converting: the cut, then the volume."""
+    filters, rate = [], []
+    if trim := found.get("trim"):
+        start, end = trim
+        # Even-sized blocks after the cut: FLAC can't start with the few samples left of a cut block
+        filters.append(f"atrim=start={start}" + (f":end={end}" if end is not None else "")
+                       + ",asetpts=PTS-STARTPTS,asetnsamples=n=4096:p=0")
+    if found.get("loudness"):
+        filters.append(found["loudness"])
+        rate = ["-ar", str(found["rate"])]
+    return ["-af", ",".join(filters), *rate] if filters else []
+
+
+def shift_chapters(chapters, start, end):
+    """Chapter times after the audio was cut to start…end (end None: to the end)."""
+    shifted = []
+    for chapter in chapters:
+        first = max(chapter.get("start_time", 0), start)
+        last = chapter.get("end_time", 0) if end is None else min(chapter.get("end_time", 0), end)
+        if last > first:
+            shifted.append({**chapter, "start_time": first - start, "end_time": last - start})
+    return shifted
+
+
+class PrepareAudio(PostProcessor):
+    """Runs just before yt-dlp's audio conversion: measures the download (loudness, silence at the
+    start and end) and hands the matching filters to the converter, so each song is encoded only once."""
+
+    def __init__(self, job, normalize, trim):
         super().__init__()
-        self.job = job
+        self.job, self.normalize, self.trim = job, normalize, trim
 
     def run(self, info):
         args = self._downloader.params.setdefault("postprocessor_args", {})
         args.pop(EXTRACT_AUDIO_ARGS, None)
         path = info.get("filepath")
         if path and os.path.isfile(path):
-            self.job.stage = "measuring"
-            if measured := loudness_filter(path):
-                args[EXTRACT_AUDIO_ARGS] = ["-af", measured[0], "-ar", str(measured[1])]
+            self.job.stage = "analysing"
+            found = measure_audio(path, loudness=self.normalize, silence=self.trim)
+            if options := conversion_args(found):
+                args[EXTRACT_AUDIO_ARGS] = options
+            if found.get("trim") and info.get("chapters"):  # chapters move with the cut (for splitting)
+                info["chapters"] = shift_chapters(info["chapters"], *found["trim"])
             self.job.stage = "converting"
         return [], info
 
@@ -677,7 +744,7 @@ def scan_albums(body):
         if not info or info.get("id") in albums:
             continue
         if info.get("_type") != "playlist":
-            problems.append(tr("{url}: this is a single video, not an album. Use Paste links for it.", url=url))
+            problems.append(tr("{url}: this is a single video, not an album. Use the Links tab for it.", url=url))
             continue
         albums.add(info["id"])
         tracks = list(video_entries(info))
@@ -772,10 +839,10 @@ def run_youtube_job(job, settings):
             ydl.add_post_processor(OwnCover(settings["cover"]), when="before_dl")  # after the jpg conversion
         if settings["square_cover"] and FFMPEG:
             ydl.add_post_processor(SquareCover(), when="before_dl")
-        if settings["normalize"] and fmt != "original" and FFMPEG:  # "original" isn't re-encoded
-            measure = MeasureLoudness(job)
-            measure.set_downloader(ydl)
-            ydl._pps["post_process"].insert(0, measure)  # must run before yt-dlp's own audio conversion
+        if (settings["normalize"] or settings["trim_silence"]) and fmt != "original" and FFMPEG:  # "original" isn't re-encoded
+            prepare = PrepareAudio(job, settings["normalize"], settings["trim_silence"])
+            prepare.set_downloader(ydl)
+            ydl._pps["post_process"].insert(0, prepare)  # must run before yt-dlp's own audio conversion
         if settings["lyrics"]:
             ydl.add_post_processor(DescriptionLyrics(), when="post_process")  # after tags and cover
         if splitter:
@@ -822,7 +889,7 @@ def run_youtube_job(job, settings):
                 if any(sign in reason for sign in BLOCKED_SIGNS):
                     job.message = tr("YouTube is temporarily blocking downloads from this computer. "
                                      "Wait an hour and press Download again (saved songs are skipped), or "
-                                     "pick your browser under \"If YouTube blocks the downloads\".")
+                                     "pick your browser in Settings (⚙) under \"If YouTube blocks the downloads\".")
                     break
 
 
@@ -907,11 +974,10 @@ def run_folder_job(job, settings):
             job.set_result(item, "skipped")
             continue
         job.set_result(item, "working")
-        volume = []
-        if settings["normalize"] and "copy" not in codec_args:  # copying can't change the volume
-            job.stage = "measuring"
-            if measured := loudness_filter(src):
-                volume = ["-af", measured[0], "-ar", str(measured[1])]
+        filters = []
+        if (settings["normalize"] or settings["trim_silence"]) and "copy" not in codec_args:  # copying can't change the audio
+            job.stage = "analysing"
+            filters = conversion_args(measure_audio(src, loudness=settings["normalize"], silence=settings["trim_silence"]))
             job.stage = "converting"
         picture_in, picture = [], []
         if cover and ext in COVER_EXTS:
@@ -919,7 +985,7 @@ def run_folder_job(job, settings):
             picture = ["-map", "1:v:0", "-c:v", "mjpeg", *crop, "-disposition:v:0", "attached_pic"]
         tmp = out / f"{stem}.part.{ext}"  # renamed when complete, so a stopped run leaves no half file
         cmd = [FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), *picture_in,
-               "-map", "0:a:0", *picture, "-map_metadata", "-1", *codec_args, *volume,  # no video-container tags
+               "-map", "0:a:0", *picture, "-map_metadata", "-1", *codec_args, *filters,  # no video-container tags
                "-metadata", f"title={display_name(item)}", *tags, str(tmp)]
         job.add_log("Converting " + src.name)
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, **TEXT)
@@ -1139,6 +1205,19 @@ def self_test(online):
         if not ok:
             failures.append(label)
 
+    def loudness(path):
+        found = measure_audio(path) if path.is_file() else {}
+        level = re.search(r"measured_I=(-?[\d.]+)", found.get("loudness", ""))
+        return float(level.group(1)) if level else None
+
+    def duration(path):
+        if not path.is_file():
+            return None
+        log = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(path), "-f", "null", "-"],
+                             capture_output=True, **TEXT).stderr
+        times = re.findall(r"time=(\d+):(\d+):([\d.]+)", log)
+        return round(int(times[-1][0]) * 3600 + int(times[-1][1]) * 60 + float(times[-1][2]), 2) if times else None
+
     check(FFMPEG and JS_RUNTIME, "ffmpeg and a JavaScript runtime found")
     if failures:
         return 1
@@ -1177,11 +1256,30 @@ def self_test(online):
         job = Job("folder", [{"id": str(quiet), "title": quiet.stem}])
         run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / "even"), normalize=True, cover=str(thumb)))
         even = tmp / "even" / "Quiet song.mp3"
-        measured = loudness_filter(even) if even.is_file() else None
-        level = float(re.search(r"measured_I=(-?[\d.]+)", measured[0]).group(1)) if measured else None
-        check(level is not None and abs(level + 14) < 1.5, f"volume evened out to -14 LUFS: {level}")
+        check(abs((loudness(even) or 0) + 14) < 1.5, f"volume evened out to -14 LUFS: {loudness(even)}")
         probe = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-i", str(even)], capture_output=True, **TEXT).stderr
         check(re.search(r"Video: mjpeg.*, 720x720", probe) is not None, "own cover embedded, square")
+
+        # 2 s of silence, 2 s of music, 3 s of silence: only the music is kept, also when evened out
+        gap = tmp / "Silent ends.m4a"
+        subprocess.run([*lavfi, "sine=frequency=440:duration=7", "-af", "volume='between(t,2,4)':eval=frame",
+                        "-c:a", "aac", str(gap)], check=True)
+        for fmt, normalize in (("flac", False), ("mp3_320", True)):
+            ext = "mp3" if fmt == "mp3_320" else fmt
+            job = Job("folder", [{"id": str(gap), "title": gap.stem}])
+            run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / f"trim-{ext}"), format=fmt,
+                                     trim_silence=True, normalize=normalize))
+            song = tmp / f"trim-{ext}" / f"{gap.stem}.{ext}"
+            length = duration(song)
+            check(length is not None and abs(length - 2) < 0.15, f"silence trimmed in .{ext}: {length} s left of 7 s")
+            if normalize:
+                check(abs((loudness(song) or 0) + 14) < 1.5, f"trimmed and evened out: {loudness(song)} LUFS")
+        job = Job("folder", [{"id": str(quiet), "title": quiet.stem}])  # no silence: nothing is cut
+        run_folder_job(job, dict(DEFAULT_SETTINGS, out=str(tmp / "no-trim"), format="flac", trim_silence=True))
+        length = duration(tmp / "no-trim" / "Quiet song.flac")
+        check(length is not None and abs(length - 6) < 0.1, f"song without silence keeps its length: {length} s")
+        moved = shift_chapters([{"start_time": 0, "end_time": 3}, {"start_time": 3, "end_time": 9}], 2, 8)
+        check(moved == [{"start_time": 0, "end_time": 1}, {"start_time": 1, "end_time": 6}], f"chapters follow the cut: {moved}")
         for suffix in (".mp3", ".flac", ".m4a"):
             song = tmp / f"lyrics{suffix}"
             subprocess.run([*lavfi, "sine=duration=1", str(song)], check=True)

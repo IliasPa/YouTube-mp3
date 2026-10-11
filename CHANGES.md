@@ -3,6 +3,36 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.6 — 2026-10-11
+
+### Added
+
+- **Trim silence at the start and end** (Settings → For the music itself): silent intros and
+  endings of half a second or more are cut, e.g. the quiet seconds before a song starts or under
+  a video's end screen. It's done in the same step as the conversion, so songs are still encoded
+  only once, and works together with "Even out the volume" and with splitting chapters into songs.
+  Not with "Original audio", which isn't re-encoded.
+- **Time left** while downloading, e.g. "12 of 300 · about 1 h 40 min left".
+- **Progress in the browser tab's title** ("12/300 · …", then "✓" when done), so you can follow a
+  long run from another tab.
+- **A sound and a notification when a run finishes** (the first time, the browser asks whether the
+  page may show notifications). Can be turned off in Settings.
+- **Sort the list**: as found, by title, longest or shortest first (largest or smallest for video
+  files). Songs are downloaded in the order shown.
+- **Shift-click** ticks or unticks all the songs between the last one you clicked and this one.
+
+### Changed
+
+- **Settings moved to a window behind the ⚙ button** next to the language flags, so the list of
+  songs comes right after the search. The settings are saved when the window closes.
+- Every option has a short name with its explanation on a smaller line below, instead of a long
+  text in brackets.
+- With "Original audio", "Even out the volume" and "Trim silence" are greyed out, with a note why.
+- **Shorter tab names**, so the tabs fit on one row in Greek too: YouTube channel, Links, Albums,
+  Video files.
+- The tool versions (ffmpeg, Deno, yt-dlp) are no longer shown on the page; the app's version and
+  yt-dlp's are at the bottom of the settings window. A warning still appears if a tool is missing.
+
 ## v0.5 — 2026-10-10
 
 ### Added

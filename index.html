@@ -31,9 +31,10 @@
   .top { display: flex; gap: 8px 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 0 4px; }
   .top h1 { margin: 0; }
   .sub { color: var(--muted); margin: 0 0 12px; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
-  .chip.bad { background: var(--warn-bg); color: var(--warn-text); }
+  .top-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+  .icon-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
+              border: 0; border-radius: 10px; background: var(--soft); color: var(--muted); }
+  .icon-btn:hover:not(:disabled) { background: var(--line); color: var(--text); }
 
   .lang { display: flex; gap: 2px; background: var(--soft); padding: 3px; border-radius: 10px; flex: none; }
   .lang button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 5px 9px;
@@ -66,6 +67,8 @@
   @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
   .check { display: flex; gap: 9px; align-items: flex-start; margin: 7px 0; font-size: 14px; color: var(--text); }
   .check input { margin: 3px 0 0; flex: none; }
+  .check small { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
+  .check:has(input:disabled) > span { opacity: .55; }
   .row .check { margin: 0; align-items: center; }
   .row .check input { margin: 0; }
   .muted { color: var(--muted); }
@@ -100,6 +103,23 @@
   .edited { font-size: 11px; color: var(--accent); margin-left: 6px; cursor: help; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--soft); color: var(--muted); margin-left: 6px; }
 
+  select.compact { width: auto; padding: 6px 30px 6px 10px; font-size: 14px; background-position: right 10px center; }
+  td.t label { user-select: none; -webkit-user-select: none; }  /* shift-click ticks a range instead of selecting text */
+
+  dialog#settings { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
+                    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text);
+                    box-shadow: 0 24px 64px rgba(0,0,0,.3); }
+  dialog#settings::backdrop { background: rgba(0,0,0,.4); }
+  .dialog-head, .dialog-foot { position: sticky; display: flex; gap: 8px; align-items: center; background: var(--card);
+                               padding: 12px 18px; z-index: 1; }
+  .dialog-head { top: 0; border-bottom: 1px solid var(--line); }
+  .dialog-head h2 { margin: 0; font-size: 17px; outline: none; }  /* focused when it opens, so no button looks pressed */
+  #close-settings { color: var(--muted); font-size: 17px; padding: 2px 8px; }
+  .dialog-foot { bottom: 0; border-top: 1px solid var(--line); }
+  .dialog-body { padding: 14px 18px 18px; }
+  .dialog-body h3:first-of-type { margin-top: 6px; }
+  #about { font-size: 12px; }
+
   .sticky { position: sticky; bottom: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
   .bar { height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; margin: 10px 0 6px; }
   .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
@@ -114,27 +134,36 @@
   <header>
     <div class="top">
       <h1>YouTube → MP3</h1>
-      <div class="lang" role="group" data-i18n-aria="language" aria-label="Language">
-        <button type="button" data-lang="en" aria-pressed="true" title="English">
-          <svg viewBox="0 0 60 30" width="21" height="14" aria-hidden="true">
-            <clipPath id="uk-t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath>
-            <path d="M0,0 v30 h60 v-30 z" fill="#012169"/>
-            <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>
-            <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#uk-t)" stroke="#C8102E" stroke-width="4"/>
-            <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>
-            <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/>
-          </svg>EN</button>
-        <button type="button" data-lang="el" aria-pressed="false" title="Ελληνικά">
-          <svg viewBox="0 0 27 18" width="21" height="14" aria-hidden="true">
-            <rect width="27" height="18" fill="#0D5EAF"/>
-            <path d="M0,3h27M0,7h27M0,11h27M0,15h27" stroke="#fff" stroke-width="2"/>
-            <rect width="10" height="10" fill="#0D5EAF"/>
-            <path d="M5,0v10M0,5h10" stroke="#fff" stroke-width="2"/>
-          </svg>ΕΛ</button>
+      <div class="top-actions">
+        <div class="lang" role="group" data-i18n-aria="language" aria-label="Language">
+          <button type="button" data-lang="en" aria-pressed="true" title="English">
+            <svg viewBox="0 0 60 30" width="21" height="14" aria-hidden="true">
+              <clipPath id="uk-t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath>
+              <path d="M0,0 v30 h60 v-30 z" fill="#012169"/>
+              <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>
+              <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#uk-t)" stroke="#C8102E" stroke-width="4"/>
+              <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>
+              <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/>
+            </svg>EN</button>
+          <button type="button" data-lang="el" aria-pressed="false" title="Ελληνικά">
+            <svg viewBox="0 0 27 18" width="21" height="14" aria-hidden="true">
+              <rect width="27" height="18" fill="#0D5EAF"/>
+              <path d="M0,3h27M0,7h27M0,11h27M0,15h27" stroke="#fff" stroke-width="2"/>
+              <rect width="10" height="10" fill="#0D5EAF"/>
+              <path d="M5,0v10M0,5h10" stroke="#fff" stroke-width="2"/>
+            </svg>ΕΛ</button>
+        </div>
+        <button type="button" class="icon-btn" id="open-settings" data-i18n-aria="settings" data-i18n-title="settings"
+                aria-label="Settings" title="Settings" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg></button>
       </div>
     </div>
     <p class="sub" data-i18n="subtitle">Save the audio of your uploads as music files, with title, date, artist and cover art.</p>
-    <div id="tools" class="chips"></div>
+    <div class="notice" id="tools-warning" hidden></div>
     <div class="notice row" id="update" hidden>
       <span id="update-text"></span>
       <span class="spacer"></span>
@@ -143,10 +172,10 @@
   </header>
 
   <div class="tabs" role="tablist">
-    <button role="tab" data-mode="youtube" aria-selected="true" data-i18n="tab_channel">From my YouTube channel</button>
-    <button role="tab" data-mode="links" aria-selected="false" data-i18n="tab_links">Paste links</button>
-    <button role="tab" data-mode="albums" aria-selected="false" data-i18n="tab_albums">Album links</button>
-    <button role="tab" data-mode="folder" aria-selected="false" data-i18n="tab_folder">From video files on this computer</button>
+    <button role="tab" data-mode="youtube" aria-selected="true" data-i18n="tab_channel">YouTube channel</button>
+    <button role="tab" data-mode="links" aria-selected="false" data-i18n="tab_links">Links</button>
+    <button role="tab" data-mode="albums" aria-selected="false" data-i18n="tab_albums">Albums</button>
+    <button role="tab" data-mode="folder" aria-selected="false" data-i18n="tab_folder">Video files</button>
   </div>
 
   <section class="card" id="src-youtube">
@@ -208,80 +237,105 @@
     </fieldset>
   </section>
 
-  <section class="card">
-    <fieldset class="lockable">
-      <h2 data-i18n="settings">Settings</h2>
-      <div class="grid">
-        <label class="field wide"><span data-i18n="save_to">Save to</span>
-          <span class="row"><input id="out" type="text">
-            <button type="button" data-choose="out" data-i18n="choose">Choose…</button>
-            <button type="button" id="open-out" data-i18n="open">Open</button></span>
-        </label>
-        <label class="field"><span data-i18n="format">Format</span>
-          <select id="format">
-            <option value="mp3_320" data-i18n="fmt_mp3_320">MP3 · 320 kbps (best quality)</option>
-            <option value="mp3_192" data-i18n="fmt_mp3_192">MP3 · 192 kbps (smaller files)</option>
-            <option value="flac" data-i18n="fmt_flac">FLAC · lossless (smaller than WAV)</option>
-            <option value="wav" data-i18n="fmt_wav">WAV · lossless (for music software, no cover)</option>
-            <option value="original" data-i18n="fmt_original">Original audio, no conversion</option>
-          </select>
-        </label>
-        <label class="field not-albums"><span data-i18n="artist">Artist</span>
-          <input id="artist" type="text" data-i18n-placeholder="artist_placeholder" placeholder="Your artist name">
-        </label>
-        <label class="field wide not-albums"><span data-i18n="album">Album</span>
-          <input id="album" type="text" placeholder="YouTube Archive">
-        </label>
-        <p class="hint wide albums-only" style="margin:0 0 12px" data-i18n="albums_details" hidden></p>
-      </div>
+  <dialog id="settings" aria-labelledby="settings-title">
+    <div class="dialog-head">
+      <h2 id="settings-title" tabindex="-1" autofocus data-i18n="settings">Settings</h2>
+      <span class="spacer"></span>
+      <button type="button" class="link" id="close-settings" data-i18n-aria="close" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="notice" id="settings-locked" data-i18n="settings_locked" hidden></p>
+      <fieldset class="lockable">
+        <div class="grid">
+          <label class="field wide"><span data-i18n="save_to">Save to</span>
+            <span class="row"><input id="out" type="text">
+              <button type="button" data-choose="out" data-i18n="choose">Choose…</button>
+              <button type="button" id="open-out" data-i18n="open">Open</button></span>
+          </label>
+          <label class="field wide"><span data-i18n="format">Format</span>
+            <select id="format">
+              <option value="mp3_320" data-i18n="fmt_mp3_320">MP3 · 320 kbps (best quality)</option>
+              <option value="mp3_192" data-i18n="fmt_mp3_192">MP3 · 192 kbps (smaller files)</option>
+              <option value="flac" data-i18n="fmt_flac">FLAC · lossless (smaller than WAV)</option>
+              <option value="wav" data-i18n="fmt_wav">WAV · lossless (for music software, no cover)</option>
+              <option value="original" data-i18n="fmt_original">Original audio, no conversion</option>
+            </select>
+          </label>
+          <label class="field not-albums"><span data-i18n="artist">Artist</span>
+            <input id="artist" type="text" data-i18n-placeholder="artist_placeholder" placeholder="Your artist name">
+          </label>
+          <label class="field not-albums"><span data-i18n="album">Album</span>
+            <input id="album" type="text" placeholder="YouTube Archive">
+          </label>
+          <p class="hint wide albums-only" style="margin:0 0 12px" data-i18n="albums_details" hidden></p>
+        </div>
 
-      <div class="yt-only not-albums">
-        <h3 data-i18n="group_tags">Tags and files</h3>
-        <label class="check"><input type="checkbox" id="song_tags">
-          <span><span data-i18n="song_tags"></span> <span class="muted" data-i18n="song_tags_hint"></span></span></label>
-        <label class="check"><input type="checkbox" id="split_chapters">
-          <span><span data-i18n="split"></span> <span class="muted" data-i18n="split_hint"></span></span></label>
-        <label class="check"><input type="checkbox" id="date_prefix">
-          <span><span data-i18n="date_prefix"></span> <span class="muted" data-i18n="date_prefix_hint"></span></span></label>
-      </div>
+        <div class="yt-only not-albums">
+          <h3 data-i18n="group_tags">Tags and files</h3>
+          <label class="check"><input type="checkbox" id="song_tags">
+            <span><span data-i18n="song_tags"></span><small data-i18n="song_tags_hint"></small></span></label>
+          <label class="check"><input type="checkbox" id="split_chapters">
+            <span><span data-i18n="split"></span><small data-i18n="split_hint"></small></span></label>
+          <label class="check"><input type="checkbox" id="date_prefix">
+            <span><span data-i18n="date_prefix"></span><small data-i18n="date_prefix_hint"></small></span></label>
+        </div>
 
-      <h3 data-i18n="group_music">For the music itself</h3>
-      <label class="check"><input type="checkbox" id="normalize">
-        <span><span data-i18n="normalize"></span> <span class="muted" data-i18n="normalize_hint"></span></span></label>
-      <label class="check yt-only"><input type="checkbox" id="lyrics">
-        <span><span data-i18n="lyrics"></span> <span class="muted" data-i18n="lyrics_hint"></span></span></label>
-      <label class="check"><input type="checkbox" id="square_cover">
-        <span><span data-i18n="square_cover"></span> <span class="muted" data-i18n="square_cover_hint"></span></span></label>
-      <label class="field" style="margin-top:10px"><span data-i18n="cover_label">Cover image</span>
-        <span class="row"><input id="cover" type="text" data-i18n-placeholder="cover_placeholder">
-          <button type="button" data-choose="cover" data-i18n="choose">Choose…</button>
-          <button type="button" id="cover-clear" data-i18n="clear">Clear</button></span>
-      </label>
-      <p class="hint" style="margin-top:-6px" data-i18n="cover_hint"></p>
-
-      <details class="yt-only">
-        <summary data-i18n="blocks_summary">If YouTube blocks the downloads</summary>
-        <label class="field"><span data-i18n="cookies_label">Use my YouTube login from this browser</span>
-          <select id="cookies">
-            <option value="" data-i18n="cookies_none">Don't use (normal)</option>
-            <option value="chrome">Chrome</option>
-            <option value="safari">Safari</option>
-            <option value="firefox">Firefox</option>
-            <option value="brave">Brave</option>
-            <option value="edge">Edge</option>
-          </select>
+        <h3 data-i18n="group_music">For the music itself</h3>
+        <label class="check"><input type="checkbox" id="normalize">
+          <span><span data-i18n="normalize"></span><small data-i18n="normalize_hint"></small></span></label>
+        <label class="check"><input type="checkbox" id="trim_silence">
+          <span><span data-i18n="trim"></span><small data-i18n="trim_hint"></small></span></label>
+        <p class="hint" id="original-note" style="margin:0 0 6px 24px" data-i18n="original_note" hidden></p>
+        <label class="check yt-only"><input type="checkbox" id="lyrics">
+          <span><span data-i18n="lyrics"></span><small data-i18n="lyrics_hint"></small></span></label>
+        <label class="check"><input type="checkbox" id="square_cover">
+          <span><span data-i18n="square_cover"></span><small data-i18n="square_cover_hint"></small></span></label>
+        <label class="field" style="margin-top:12px"><span data-i18n="cover_label">Cover image</span>
+          <span class="row"><input id="cover" type="text" data-i18n-placeholder="cover_placeholder">
+            <button type="button" data-choose="cover" data-i18n="choose">Choose…</button>
+            <button type="button" id="cover-clear" data-i18n="clear">Clear</button></span>
         </label>
-        <p class="hint" data-i18n="cookies_hint"></p>
-      </details>
-    </fieldset>
-  </section>
+        <p class="hint" style="margin-top:-6px" data-i18n="cover_hint"></p>
+
+        <h3 data-i18n="group_finish">When a download finishes</h3>
+        <label class="check"><input type="checkbox" id="notify">
+          <span><span data-i18n="notify"></span><small data-i18n="notify_hint"></small></span></label>
+
+        <details class="yt-only">
+          <summary data-i18n="blocks_summary">If YouTube blocks the downloads</summary>
+          <label class="field"><span data-i18n="cookies_label">Use my YouTube login from this browser</span>
+            <select id="cookies">
+              <option value="" data-i18n="cookies_none">Don't use (normal)</option>
+              <option value="chrome">Chrome</option>
+              <option value="safari">Safari</option>
+              <option value="firefox">Firefox</option>
+              <option value="brave">Brave</option>
+              <option value="edge">Edge</option>
+            </select>
+          </label>
+          <p class="hint" data-i18n="cookies_hint"></p>
+        </details>
+      </fieldset>
+    </div>
+    <div class="dialog-foot">
+      <span class="muted" id="about"></span>
+      <span class="spacer"></span>
+      <button type="button" class="primary" id="done-settings" data-i18n="done">Done</button>
+    </div>
+  </dialog>
 
   <section class="card" id="list-card" hidden>
     <fieldset class="lockable">
       <div class="row">
         <h2 id="list-title" style="margin:0"></h2>
         <span class="spacer"></span>
-        <input id="filter" type="search" data-i18n-placeholder="filter" style="max-width:260px">
+        <select id="sort" class="compact" data-i18n-aria="sort" aria-label="Order">
+          <option value="found"></option>
+          <option value="title"></option>
+          <option value="long"></option>
+          <option value="short"></option>
+        </select>
+        <input id="filter" type="search" data-i18n-placeholder="filter" style="max-width:240px">
       </div>
       <div class="row" style="margin-top:8px">
         <span class="muted" data-i18n="select">Select:</span>
@@ -299,6 +353,7 @@
       </div>
       <div class="notice" id="problems" hidden></div>
       <div class="table-wrap"><table><tbody id="rows"></tbody></table></div>
+      <p class="hint" data-i18n="shift_hint"></p>
     </fieldset>
   </section>
 
@@ -338,17 +393,17 @@ const I18N = {
     hide_notice: "Hide this notice",
     no_ffmpeg: "ffmpeg missing: start the app again to install it",
     no_js: "No JavaScript runtime: YouTube downloads may fail",
-    tab_channel: "From my YouTube channel",
-    tab_links: "Paste links",
-    tab_albums: "Album links",
-    tab_folder: "From video files on this computer",
+    tab_channel: "YouTube channel",
+    tab_links: "Links",
+    tab_albums: "Albums",
+    tab_folder: "Video files",
     channel_label: "Your channel link",
     include: "Include:",
     videos: "Videos",
     streams: "Live streams",
     shorts: "Shorts",
     find_videos: "Find videos",
-    channel_hint: 'Only <strong>public</strong> videos are listed. For unlisted ones, paste their links in <strong>Paste links</strong>. For private ones, export your channel with <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> and use the last tab.',
+    channel_hint: 'Only <strong>public</strong> videos are listed. For unlisted ones, paste their links in <strong>Links</strong>. For private ones, export your channel with <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> and use <strong>Video files</strong>.',
     busy_channel: "Reading your channel… (big channels take a minute)",
     links_label: "YouTube links: videos, Shorts or playlists, one per line",
     links_hint: "You can paste a whole message or list: the links are picked out of the text. Unlisted videos work too, as long as you have their link.",
@@ -363,6 +418,10 @@ const I18N = {
     find_files: "Find files",
     busy_folder: "Looking for files…",
     settings: "Settings",
+    close: "Close",
+    done: "Done",
+    settings_locked: "The settings can be changed when the download has finished.",
+    about: ({ version, ytdlp }) => `YouTube → MP3 v${version} · yt-dlp ${ytdlp}`,
     save_to: "Save to",
     open: "Open",
     format: "Format",
@@ -376,28 +435,43 @@ const I18N = {
     album: "Album",
     albums_details: "Artist, album, track numbers and year come from each album.",
     group_tags: "Tags and files",
-    song_tags: "Use the song's own details when YouTube Music knows the song",
-    song_tags_hint: "(title, artist, album, release date; other videos keep their title and the Artist and Album above)",
-    split: "Split videos with chapters into separate songs",
-    split_hint: "(e.g. a live stream or concert: numbered tracks in a folder named after the video)",
-    date_prefix: "Start file names with the upload date",
-    date_prefix_hint: "(2021-03-14 - Song title.mp3)",
+    song_tags: "Use the song's details from YouTube Music",
+    song_tags_hint: "Its real title, artist, album and release date, when YouTube Music knows the song. Other videos keep their own title.",
+    split: "Split videos with chapters into songs",
+    split_hint: "A concert or live stream becomes numbered tracks in its own folder.",
+    date_prefix: "Upload date at the start of file names",
+    date_prefix_hint: "2021-03-14 - Song title.mp3",
     group_music: "For the music itself",
     normalize: "Even out the volume",
-    normalize_hint: "(every song as loud as on streaming services, −14 LUFS, in one even step that keeps the dynamics; not with Original audio)",
-    lyrics: "Save the video description as lyrics",
-    lyrics_hint: "(for your own lyrics or credits; shown in Apple Music and most players)",
+    normalize_hint: "Every song as loud as on streaming services (−14 LUFS), keeping its dynamics.",
+    trim: "Trim silence at the start and end",
+    trim_hint: "Cuts silent intros and endings of half a second or more.",
+    original_note: "Original audio isn't converted, so its volume and silence stay as they are.",
+    lyrics: "Save the description as lyrics",
+    lyrics_hint: "Your lyrics or credits from the video description, shown in Apple Music and most players.",
     square_cover: "Square cover art",
-    square_cover_hint: "(crop the picture to a square)",
+    square_cover_hint: "Crops the picture to a square.",
     cover_label: "Cover image",
     cover_placeholder: "Empty: the video thumbnail",
     clear: "Clear",
     cover_hint: "Your own picture for every song, e.g. your logo or album artwork. Not for WAV.",
+    group_finish: "When a download finishes",
+    notify: "Play a sound and show a notification",
+    notify_hint: "The first time, your browser asks whether this page may show notifications.",
+    notify_title: "YouTube → MP3",
     blocks_summary: "If YouTube blocks the downloads",
     cookies_label: "Use my YouTube login from this browser",
     cookies_none: "Don't use (normal)",
     cookies_hint: "Only needed if songs fail with “Sign in to confirm you’re not a bot”. You must be signed in to YouTube in that browser. Safari also needs Full Disk Access for Terminal (System Settings → Privacy & Security).",
     filter: "Filter by title",
+    sort: "Order",
+    sort_found: "As found",
+    sort_title: "Title A–Z",
+    sort_long: "Longest first",
+    sort_short: "Shortest first",
+    sort_big: "Largest first",
+    sort_small: "Smallest first",
+    shift_hint: "Tip: hold Shift and click to tick or untick all the songs in between.",
     select: "Select:",
     sel_new: "Not saved yet",
     sel_all: "All",
@@ -430,10 +504,13 @@ const I18N = {
     stop: "Stop",
     stopping: "Stopping…",
     progress: ({ i, n }) => `${i} of ${n}`,
+    left_soon: "less than a minute left",
+    left_min: ({ m }) => `about ${m} min left`,
+    left_hours: ({ h, m }) => `about ${h} h ${m} min left`,
     stage_starting: "Starting",
     stage_downloading: "Downloading",
     stage_converting: "Converting",
-    stage_measuring: "Measuring the volume",
+    stage_analysing: "Checking the audio",
     stage_pausing: "Pausing a few seconds (keeps YouTube happy)",
     stage_working: "Working",
     lost_contact: "Lost contact with the app. Is its window still open?",
@@ -460,17 +537,17 @@ const I18N = {
     hide_notice: "Απόκρυψη της ειδοποίησης",
     no_ffmpeg: "Λείπει το ffmpeg: ανοίξτε ξανά την εφαρμογή για να εγκατασταθεί",
     no_js: "Δεν βρέθηκε JavaScript runtime: οι λήψεις από το YouTube ίσως αποτύχουν",
-    tab_channel: "Από το κανάλι μου στο YouTube",
-    tab_links: "Επικόλληση συνδέσμων",
-    tab_albums: "Σύνδεσμοι άλμπουμ",
-    tab_folder: "Από αρχεία βίντεο στον υπολογιστή",
+    tab_channel: "Κανάλι YouTube",
+    tab_links: "Σύνδεσμοι",
+    tab_albums: "Άλμπουμ",
+    tab_folder: "Αρχεία βίντεο",
     channel_label: "Ο σύνδεσμος του καναλιού σας",
     include: "Να συμπεριληφθούν:",
     videos: "Βίντεο",
     streams: "Ζωντανές μεταδόσεις",
     shorts: "Shorts",
     find_videos: "Εύρεση βίντεο",
-    channel_hint: 'Εμφανίζονται μόνο τα <strong>δημόσια</strong> βίντεο. Για τα μη καταχωρισμένα, επικολλήστε τους συνδέσμους τους στην <strong>Επικόλληση συνδέσμων</strong>. Για τα ιδιωτικά, εξαγάγετε το κανάλι σας με το <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> και χρησιμοποιήστε την τελευταία καρτέλα.',
+    channel_hint: 'Εμφανίζονται μόνο τα <strong>δημόσια</strong> βίντεο. Για τα μη καταχωρισμένα, επικολλήστε τους συνδέσμους τους στους <strong>Συνδέσμους</strong>. Για τα ιδιωτικά, εξαγάγετε το κανάλι σας με το <a href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a> και χρησιμοποιήστε τα <strong>Αρχεία βίντεο</strong>.',
     busy_channel: "Ανάγνωση του καναλιού… (τα μεγάλα κανάλια θέλουν ένα λεπτό)",
     links_label: "Σύνδεσμοι YouTube: βίντεο, Shorts ή λίστες αναπαραγωγής, ένας ανά γραμμή",
     links_hint: "Μπορείτε να επικολλήσετε ολόκληρο μήνυμα ή λίστα: οι σύνδεσμοι εντοπίζονται μέσα στο κείμενο. Λειτουργούν και τα μη καταχωρισμένα βίντεο, αρκεί να έχετε τον σύνδεσμό τους.",
@@ -485,6 +562,10 @@ const I18N = {
     find_files: "Εύρεση αρχείων",
     busy_folder: "Αναζήτηση αρχείων…",
     settings: "Ρυθμίσεις",
+    close: "Κλείσιμο",
+    done: "Εντάξει",
+    settings_locked: "Οι ρυθμίσεις αλλάζουν όταν τελειώσει η λήψη.",
+    about: ({ version, ytdlp }) => `YouTube → MP3 v${version} · yt-dlp ${ytdlp}`,
     save_to: "Αποθήκευση σε",
     open: "Άνοιγμα",
     format: "Μορφή",
@@ -498,28 +579,43 @@ const I18N = {
     album: "Άλμπουμ",
     albums_details: "Ο καλλιτέχνης, το άλμπουμ, οι αριθμοί των κομματιών και η χρονιά προέρχονται από κάθε άλμπουμ.",
     group_tags: "Ετικέτες και αρχεία",
-    song_tags: "Χρήση των στοιχείων του τραγουδιού, όταν το YouTube Music το γνωρίζει",
-    song_tags_hint: "(τίτλος, καλλιτέχνης, άλμπουμ, ημερομηνία κυκλοφορίας· τα υπόλοιπα βίντεο κρατούν τον τίτλο τους και τον Καλλιτέχνη και το Άλμπουμ από πάνω)",
-    split: "Χωρισμός βίντεο με κεφάλαια σε ξεχωριστά τραγούδια",
-    split_hint: "(π.χ. ζωντανή μετάδοση ή συναυλία: αριθμημένα κομμάτια σε φάκελο με το όνομα του βίντεο)",
-    date_prefix: "Η ημερομηνία ανεβάσματος στην αρχή του ονόματος αρχείου",
-    date_prefix_hint: "(2021-03-14 - Τίτλος τραγουδιού.mp3)",
+    song_tags: "Στοιχεία του τραγουδιού από το YouTube Music",
+    song_tags_hint: "Ο πραγματικός τίτλος, καλλιτέχνης, άλμπουμ και ημερομηνία κυκλοφορίας, όταν το YouTube Music γνωρίζει το τραγούδι. Τα άλλα βίντεο κρατούν τον τίτλο τους.",
+    split: "Χωρισμός βίντεο με κεφάλαια σε τραγούδια",
+    split_hint: "Μια συναυλία ή ζωντανή μετάδοση γίνεται αριθμημένα κομμάτια στον δικό της φάκελο.",
+    date_prefix: "Ημερομηνία ανεβάσματος στην αρχή του ονόματος",
+    date_prefix_hint: "2021-03-14 - Τίτλος τραγουδιού.mp3",
     group_music: "Για την ίδια τη μουσική",
     normalize: "Εξίσωση της έντασης",
-    normalize_hint: "(κάθε τραγούδι στην ένταση των υπηρεσιών streaming, −14 LUFS, με μία ομοιόμορφη αλλαγή που κρατά τη δυναμική· όχι με τον Αρχικό ήχο)",
-    lyrics: "Αποθήκευση της περιγραφής του βίντεο ως στίχων",
-    lyrics_hint: "(για τους δικούς σας στίχους ή τους συντελεστές· εμφανίζονται στο Apple Music και στις περισσότερες εφαρμογές)",
+    normalize_hint: "Κάθε τραγούδι στην ένταση των υπηρεσιών streaming (−14 LUFS), χωρίς να χάνει τη δυναμική του.",
+    trim: "Αφαίρεση της σιωπής στην αρχή και στο τέλος",
+    trim_hint: "Κόβει σιωπηλές εισαγωγές και καταλήξεις μισού δευτερολέπτου ή περισσότερο.",
+    original_note: "Ο αρχικός ήχος δεν μετατρέπεται, οπότε η ένταση και η σιωπή του μένουν ως έχουν.",
+    lyrics: "Αποθήκευση της περιγραφής ως στίχων",
+    lyrics_hint: "Οι στίχοι ή οι συντελεστές σας από την περιγραφή του βίντεο· εμφανίζονται στο Apple Music και στις περισσότερες εφαρμογές.",
     square_cover: "Τετράγωνο εξώφυλλο",
-    square_cover_hint: "(περικοπή της εικόνας σε τετράγωνο)",
+    square_cover_hint: "Περικοπή της εικόνας σε τετράγωνο.",
     cover_label: "Εικόνα εξωφύλλου",
     cover_placeholder: "Κενό: η μικρογραφία του βίντεο",
     clear: "Καθαρισμός",
     cover_hint: "Η δική σας εικόνα για κάθε τραγούδι, π.χ. το λογότυπό σας ή το εξώφυλλο του άλμπουμ. Όχι για WAV.",
+    group_finish: "Στο τέλος μιας λήψης",
+    notify: "Ήχος και ειδοποίηση",
+    notify_hint: "Την πρώτη φορά, ο περιηγητής ρωτά αν αυτή η σελίδα μπορεί να εμφανίζει ειδοποιήσεις.",
+    notify_title: "YouTube → MP3",
     blocks_summary: "Αν το YouTube μπλοκάρει τις λήψεις",
     cookies_label: "Χρήση της σύνδεσής μου στο YouTube από αυτόν τον περιηγητή",
     cookies_none: "Να μη χρησιμοποιηθεί (κανονικά)",
     cookies_hint: "Χρειάζεται μόνο αν τα τραγούδια αποτυγχάνουν με το μήνυμα «Sign in to confirm you’re not a bot». Πρέπει να είστε συνδεδεμένοι στο YouTube σε αυτόν τον περιηγητή. Το Safari χρειάζεται επίσης Πλήρη πρόσβαση στον δίσκο για το Τερματικό (Ρυθμίσεις συστήματος → Απόρρητο και ασφάλεια).",
     filter: "Φιλτράρισμα κατά τίτλο",
+    sort: "Σειρά",
+    sort_found: "Όπως βρέθηκαν",
+    sort_title: "Τίτλος Α–Ω",
+    sort_long: "Μεγαλύτερη διάρκεια πρώτα",
+    sort_short: "Μικρότερη διάρκεια πρώτα",
+    sort_big: "Μεγαλύτερα αρχεία πρώτα",
+    sort_small: "Μικρότερα αρχεία πρώτα",
+    shift_hint: "Συμβουλή: κρατήστε πατημένο το Shift και κάντε κλικ για να επιλέξετε ή να αποεπιλέξετε όλα τα ενδιάμεσα.",
     select: "Επιλογή:",
     sel_new: "Όσα δεν έχουν αποθηκευτεί",
     sel_all: "Όλα",
@@ -552,10 +648,13 @@ const I18N = {
     stop: "Διακοπή",
     stopping: "Διακοπή…",
     progress: ({ i, n }) => `${i} από ${n}`,
+    left_soon: "λιγότερο από ένα λεπτό ακόμη",
+    left_min: ({ m }) => `περίπου ${m} λεπ. ακόμη`,
+    left_hours: ({ h, m }) => `περίπου ${h} ώρ. ${m} λεπ. ακόμη`,
     stage_starting: "Έναρξη",
     stage_downloading: "Λήψη",
     stage_converting: "Μετατροπή",
-    stage_measuring: "Μέτρηση της έντασης",
+    stage_analysing: "Έλεγχος του ήχου",
     stage_pausing: "Μικρή παύση (για να μη μας μπλοκάρει το YouTube)",
     stage_working: "Σε εξέλιξη",
     lost_contact: "Χάθηκε η επικοινωνία με την εφαρμογή. Είναι ακόμη ανοιχτό το παράθυρό της;",
@@ -593,6 +692,7 @@ function applyLanguage() {
   // The parts drawn from data
   if (lastTools) renderTools(lastTools);
   renderUpdate(lastUpdate);
+  renderSortLabels();
   countLinks("links");
   countLinks("albums");
   renderListHeader();
@@ -619,6 +719,7 @@ let pollTimer = null;
 let editing = false;     // titles shown as text boxes
 let lastLog = [];
 let lastTools = null, lastUpdate = null, lastFinished = null;
+const BASE_TITLE = document.title;  // the tab shows the progress in front of it
 
 async function api(path, body) {
   const options = body === undefined ? { headers: { "X-Lang": lang } } :
@@ -636,7 +737,7 @@ function showError(id, message) {
   el.hidden = !message;
 }
 
-const CHECKBOXES = ["date_prefix", "square_cover", "song_tags", "split_chapters", "normalize", "lyrics"];
+const CHECKBOXES = ["date_prefix", "square_cover", "song_tags", "split_chapters", "normalize", "trim_silence", "lyrics", "notify"];
 const TEXTS = ["url", "links", "albums", "folder", "out", "format", "artist", "album", "cookies", "cover"];
 
 function currentSettings() {
@@ -650,7 +751,27 @@ function applySettings(s) {
   for (const key of TEXTS) $("#" + key).value = s[key] ?? "";
   for (const key of CHECKBOXES) $("#" + key).checked = !!s[key];
   $$("input[name=tab]").forEach((c) => { c.checked = (s.tabs || []).includes(c.value); });
+  renderFormatNote();
 }
+
+// ---------- settings window ----------
+
+const settingsDialog = $("#settings");
+$("#open-settings").addEventListener("click", () => settingsDialog.showModal());
+$("#close-settings").addEventListener("click", () => settingsDialog.close());
+$("#done-settings").addEventListener("click", () => settingsDialog.close());
+settingsDialog.addEventListener("click", (e) => { if (e.target === settingsDialog) settingsDialog.close(); });  // the dimmed page around it
+settingsDialog.addEventListener("close", () => {
+  if (!pollTimer) api("/api/settings", currentSettings()).catch(() => {});
+});
+
+// Original audio is copied as it is, so its volume and silence can't be changed
+function renderFormatNote() {
+  const original = $("#format").value === "original";
+  $("#normalize").disabled = $("#trim_silence").disabled = original;
+  $("#original-note").hidden = !original;
+}
+$("#format").addEventListener("change", renderFormatNote);
 
 // A newer release fixes YouTube downloads that stopped working; show it until closed for that version
 function renderUpdate(update) {
@@ -667,15 +788,13 @@ function renderUpdate(update) {
   };
 }
 
+// The tools only show up on the page when one is missing; the versions are in the settings window
 function renderTools(tools) {
   lastTools = tools;
-  const chips = [
-    [`v${tools.version}`, ""],
-    tools.ffmpeg ? ["ffmpeg ✓", ""] : [t("no_ffmpeg"), "bad"],
-    tools.js ? [`${tools.js} ✓`, ""] : [t("no_js"), "bad"],
-    [`yt-dlp ${tools.ytdlp}`, ""],
-  ];
-  $("#tools").innerHTML = chips.map(([text, cls]) => `<span class="chip ${cls}">${esc(text)}</span>`).join("");
+  const missing = [!tools.ffmpeg && t("no_ffmpeg"), !tools.js && t("no_js")].filter(Boolean);
+  $("#tools-warning").innerHTML = missing.map(esc).join("<br>");
+  $("#tools-warning").hidden = missing.length === 0;
+  $("#about").textContent = t("about", { version: tools.version, ytdlp: tools.ytdlp });
 }
 
 function setMode(next) {
@@ -690,6 +809,7 @@ function setMode(next) {
       (el.classList.contains("not-albums") && mode === "albums");
   });
   $$(".albums-only").forEach((el) => { el.hidden = mode !== "albums"; });
+  renderSortLabels();
   setItems([]);
 }
 
@@ -709,12 +829,15 @@ const fmtSize = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.max(1, Ma
 
 function setItems(list, found = []) {
   items = list;
+  items.forEach((item, i) => { item.pos = i; });  // the order they were found in
+  sortItems();
   problems = found;
-  index = new Map(items.map((item, i) => [item.id, i]));
   selected = new Set(items.filter((i) => !i.done).map((i) => i.id));
   results = {};
   editing = false;
   lastFinished = null;
+  anchorId = null;
+  document.title = BASE_TITLE;
   $("#filter").value = "";
   $("#list-card").hidden = $("#action").hidden = items.length === 0;
   $("#summary").hidden = true;
@@ -733,6 +856,30 @@ function renderListHeader() {
 }
 
 const displayName = (item) => item.name || item.title;
+
+// ---------- order ----------
+
+function renderSortLabels() {
+  const folder = mode === "folder";  // files: by size instead of length
+  const labels = { found: "sort_found", title: "sort_title", long: folder ? "sort_big" : "sort_long",
+                   short: folder ? "sort_small" : "sort_short" };
+  $$("#sort option").forEach((o) => { o.textContent = t(labels[o.value]); });
+}
+
+// Songs are downloaded in the order shown
+function sortItems() {
+  const amount = (i) => (mode === "folder" ? i.size : i.duration) || 0;
+  const found = (a, b) => a.pos - b.pos;
+  const order = {
+    title: (a, b) => displayName(a).localeCompare(displayName(b), lang, { numeric: true, sensitivity: "base" }) || found(a, b),
+    long: (a, b) => amount(b) - amount(a) || found(a, b),
+    short: (a, b) => amount(a) - amount(b) || found(a, b),
+  }[$("#sort").value] || found;
+  items.sort(order);
+  index = new Map(items.map((item, i) => [item.id, i]));
+}
+
+$("#sort").addEventListener("change", () => { sortItems(); renderRows(); });
 
 function renderRows() {
   const sections = new Set(items.map((i) => i.section).filter(Boolean));
@@ -779,10 +926,25 @@ function updateCount() {
   $("#start-hint").textContent = resaves ? t("resave_hint", { n: resaves }) : "";
 }
 
+// Shift-click ticks (or unticks) every shown song between the last one clicked and this one
+let anchorId = null, shiftClick = false;
+$("#rows").addEventListener("mousedown", (e) => {
+  shiftClick = e.shiftKey;
+  if (e.shiftKey && !e.target.classList.contains("title-edit")) e.preventDefault();  // no text selection
+});
 $("#rows").addEventListener("change", (e) => {
   if (e.target.type !== "checkbox") return;
-  const item = items[Number(e.target.closest("tr").dataset.i)];
-  e.target.checked ? selected.add(item.id) : selected.delete(item.id);
+  const row = e.target.closest("tr");
+  const rows = visibleRows();
+  const from = rows.findIndex((tr) => items[Number(tr.dataset.i)].id === anchorId), to = rows.indexOf(row);
+  const range = shiftClick && from >= 0 && to >= 0 ? rows.slice(Math.min(from, to), Math.max(from, to) + 1) : [row];
+  for (const tr of range) {
+    const item = items[Number(tr.dataset.i)];
+    tr.querySelector("input[type=checkbox]").checked = e.target.checked;
+    e.target.checked ? selected.add(item.id) : selected.delete(item.id);
+  }
+  anchorId = items[Number(row.dataset.i)].id;
+  shiftClick = false;
   updateCount();
 });
 
@@ -913,10 +1075,52 @@ function setLocked(locked) {
   $$(".tabs button").forEach((b) => { b.disabled = locked; });
   $("#start-row").hidden = locked;
   $("#progress").hidden = !locked;
+  $("#settings-locked").hidden = !locked;
+}
+
+// ---------- sound and notification when a run finishes ----------
+// Browsers allow both only after a click, so they're prepared when Download is pressed.
+
+let audio = null;
+function prepareAlerts() {
+  if (!$("#notify").checked) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+  } catch {}
+  try {
+    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  } catch {}
+}
+
+function chime() {  // two soft notes, E then A
+  if (!audio) return;
+  const now = audio.currentTime;
+  for (const [freq, at] of [[659.25, 0], [880, 0.18]]) {
+    const note = audio.createOscillator(), gain = audio.createGain();
+    note.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, now + at);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + at + 0.8);
+    note.connect(gain).connect(audio.destination);
+    note.start(now + at);
+    note.stop(now + at + 0.85);
+  }
+}
+
+function alertFinished(job) {
+  if (!$("#notify").checked || job.cancelled) return;  // pressing Stop needs no reminder
+  try { chime(); } catch {}
+  try {
+    if ("Notification" in window && Notification.permission === "granted" && (document.hidden || !document.hasFocus())) {
+      new Notification(t("notify_title"), { body: summaryText(job) });
+    }
+  } catch {}
 }
 
 $("#start").addEventListener("click", async () => {
   showError("#start-error", "");
+  prepareAlerts();
   const chosen = items.filter((i) => selected.has(i.id)).map((i) => ({ ...i, force: !!i.done }));
   try {
     await api("/api/start", { mode, items: chosen, settings: currentSettings() });
@@ -967,7 +1171,9 @@ function renderJob(job) {
   const finishedCount = job.ok + job.skipped + job.failed.length;
   const share = job.total ? (finishedCount + (downloading ? job.percent / 100 : 0)) / job.total : 0;
   $("#p-bar").style.width = `${Math.min(100, share * 100).toFixed(1)}%`;
-  $("#p-count").textContent = t("progress", { i: Math.min(job.index, job.total), n: job.total });
+  const position = Math.min(job.index, job.total);
+  $("#p-count").textContent = t("progress", { i: position, n: job.total }) + timeLeft(job, job.total - finishedCount);
+  document.title = `${position}/${job.total} · ${BASE_TITLE}`;
   const pct = downloading && job.percent ? ` (${Math.round(job.percent)}%)` : "";
   const stage = t("stage_" + (job.stage || "working"));
   $("#p-current").textContent = job.current ? `${stage}${pct}: ${job.current}` : "";
@@ -976,10 +1182,22 @@ function renderJob(job) {
   if (job.finished) finishJob(job);
 }
 
+// From the average time of the songs done so far (skipped ones take no time)
+function timeLeft(job, left) {
+  const worked = job.ok + job.failed.length;
+  if (!worked || left <= 0 || !job.done_at) return "";
+  const each = job.done_at / worked;
+  const seconds = Math.max(each * left - (job.elapsed - job.done_at), each * (left - 1));
+  const m = Math.round(seconds / 60);
+  return " · " + (m < 1 ? t("left_soon") : m < 60 ? t("left_min", { m }) : t("left_hours", { h: Math.floor(m / 60), m: m % 60 }));
+}
+
 function finishJob(job) {
   clearInterval(pollTimer);
   pollTimer = null;
   setLocked(false);
+  document.title = job.cancelled ? BASE_TITLE : `✓ ${BASE_TITLE}`;
+  alertFinished(job);
   for (const [id, status] of Object.entries(job.results)) {
     const item = items[index.get(id)];
     if (item && (status === "ok" || status === "skipped")) {
@@ -993,12 +1211,17 @@ function finishJob(job) {
   renderSummary(job);
 }
 
-function renderSummary(job) {
-  lastFinished = job;
+function summaryParts(job) {
   const parts = [t("n_saved", { n: job.ok })];
   if (job.skipped) parts.push(t("n_there", { n: job.skipped }));
   if (job.failed.length) parts.push(t("n_failed", { n: job.failed.length }));
-  let html = `<strong>${esc(t(job.cancelled ? "stopped" : "finished"))}</strong> ${esc(parts.join(" · "))}.
+  return parts.join(" · ");
+}
+const summaryText = (job) => `${t(job.cancelled ? "stopped" : "finished")} ${summaryParts(job)}.`;
+
+function renderSummary(job) {
+  lastFinished = job;
+  let html = `<strong>${esc(t(job.cancelled ? "stopped" : "finished"))}</strong> ${esc(summaryParts(job))}.
     <button type="button" class="link" id="summary-open">${esc(t("open_folder"))}</button>`;
   if (job.message) html += `<div class="notice">${esc(job.message)}</div>`;
   if (job.failed.length) {
