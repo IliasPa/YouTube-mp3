@@ -3,6 +3,12 @@
 All notable changes to YouTube → MP3, newest first. Each version has a matching git tag and a
 [GitHub release](https://github.com/IliasPa/YouTube-mp3/releases) with the ready-made apps.
 
+## v0.6.1 — 2026-10-26
+
+### Changed
+
+- Built with yt-dlp 2026.10.21, to keep YouTube downloads working.
+
 ## v0.6 — 2026-10-11
 
 ### Added

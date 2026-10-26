@@ -39,7 +39,7 @@ import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
 from yt_dlp.utils import DownloadCancelled, DownloadError, sanitize_filename
 
-APP_VERSION = "0.6"  # keep in step with CHANGES.md and the git tag
+APP_VERSION = "0.6.1"  # keep in step with CHANGES.md and the git tag
 FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (PyInstaller)
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 BUNDLED_BIN = HERE / "bin"  # the packaged app ships ffmpeg and deno here
